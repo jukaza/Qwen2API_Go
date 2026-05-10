@@ -79,6 +79,70 @@ func TestConvertAnthropicRequestSupportsToolResultMetadata(t *testing.T) {
 	}
 }
 
+func TestConvertAnthropicRequestSupportsLiteLLMOpenAIStyleFields(t *testing.T) {
+	payload := anthropicRequest{
+		Model:  "qwen3-235b-a22b",
+		System: json.RawMessage(`"base system"`),
+		Messages: []anthropicMessage{{
+			Role: "user",
+			Content: json.RawMessage(`[
+				{"type":"text","text":"describe"},
+				{"type":"image_url","image_url":{"url":"data:image/png;base64,YWJj"}}
+			]`),
+		}},
+		Tools: []anthropicTool{{
+			Type: "function",
+			Function: &anthropicFunction{
+				Name:        "search",
+				Description: "Search docs",
+				Parameters:  map[string]any{"type": "object"},
+			},
+		}},
+		ToolChoice:          json.RawMessage(`{"type":"function","name":"search"}`),
+		ResponseFormat:      json.RawMessage(`{"type":"json_object"}`),
+		ReasoningEffort:     "high",
+		Thinking:            json.RawMessage(`{"type":"enabled","budget_tokens":8192}`),
+		Stop:                json.RawMessage(`["END"]`),
+		MaxTokens:           4096,
+		MaxCompletionTokens: 1024,
+		ParallelToolCalls:   ptrBool(true),
+		User:                "user-1",
+	}
+
+	result, err := convertAnthropicRequest(payload)
+	if err != nil {
+		t.Fatalf("convertAnthropicRequest() error = %v", err)
+	}
+	if result.ReasoningEffort != "high" {
+		t.Fatalf("ReasoningEffort = %v, want high", result.ReasoningEffort)
+	}
+	if result.EnableThinking != true {
+		t.Fatalf("EnableThinking = %v, want true", result.EnableThinking)
+	}
+	if result.NestedReasoningEffort != "high" {
+		t.Fatalf("NestedReasoningEffort = %v, want high", result.NestedReasoningEffort)
+	}
+	system := result.Messages[0]["content"].(string)
+	if !strings.Contains(system, "base system") || !strings.Contains(system, "valid JSON object") {
+		t.Fatalf("system content missing response_format instruction: %q", system)
+	}
+	userContent := result.Messages[1]["content"].([]map[string]any)
+	imageURL := userContent[1]["image_url"].(map[string]any)["url"]
+	if imageURL != "data:image/png;base64,YWJj" {
+		t.Fatalf("image url = %v", imageURL)
+	}
+	tools := result.Tools.([]any)
+	fn := tools[0].(map[string]any)["function"].(map[string]any)
+	if fn["name"] != "search" {
+		t.Fatalf("tool function = %#v", fn)
+	}
+	toolChoice := result.ToolChoice.(map[string]any)
+	choiceFn := toolChoice["function"].(map[string]any)
+	if choiceFn["name"] != "search" {
+		t.Fatalf("tool choice = %#v", toolChoice)
+	}
+}
+
 func TestHandleAnthropicNonStreamMapsStableToolUseAndStopReason(t *testing.T) {
 	handler := &Handler{
 		cfg:     config.Config{},
@@ -252,5 +316,9 @@ func TestExtractAPIKeyPrefersXAPIKey(t *testing.T) {
 }
 
 func ptrFloat(v float64) *float64 {
+	return &v
+}
+
+func ptrBool(v bool) *bool {
 	return &v
 }

@@ -19,18 +19,25 @@ import (
 var anthropicVersionPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 type anthropicRequest struct {
-	Model         string             `json:"model"`
-	Messages      []anthropicMessage `json:"messages"`
-	System        json.RawMessage    `json:"system"`
-	MaxTokens     int                `json:"max_tokens"`
-	Stream        bool               `json:"stream"`
-	Tools         []anthropicTool    `json:"tools"`
-	ToolChoice    json.RawMessage    `json:"tool_choice"`
-	Metadata      map[string]any     `json:"metadata"`
-	StopSequences []string           `json:"stop_sequences"`
-	Temperature   *float64           `json:"temperature"`
-	TopP          *float64           `json:"top_p"`
-	TopK          *int               `json:"top_k"`
+	Model               string             `json:"model"`
+	Messages            []anthropicMessage `json:"messages"`
+	System              json.RawMessage    `json:"system"`
+	MaxTokens           int                `json:"max_tokens"`
+	MaxCompletionTokens int                `json:"max_completion_tokens"`
+	Stream              bool               `json:"stream"`
+	Tools               []anthropicTool    `json:"tools"`
+	ToolChoice          json.RawMessage    `json:"tool_choice"`
+	Metadata            map[string]any     `json:"metadata"`
+	StopSequences       []string           `json:"stop_sequences"`
+	Stop                json.RawMessage    `json:"stop"`
+	Temperature         *float64           `json:"temperature"`
+	TopP                *float64           `json:"top_p"`
+	TopK                *int               `json:"top_k"`
+	ParallelToolCalls   *bool              `json:"parallel_tool_calls"`
+	ResponseFormat      json.RawMessage    `json:"response_format"`
+	User                string             `json:"user"`
+	ReasoningEffort     any                `json:"reasoning_effort"`
+	Thinking            json.RawMessage    `json:"thinking"`
 }
 
 type anthropicCountTokensResponse struct {
@@ -43,15 +50,24 @@ type anthropicMessage struct {
 }
 
 type anthropicTool struct {
+	Type        string             `json:"type"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	InputSchema map[string]any     `json:"input_schema"`
+	Function    *anthropicFunction `json:"function,omitempty"`
+}
+
+type anthropicFunction struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
-	InputSchema map[string]any `json:"input_schema"`
+	Parameters  map[string]any `json:"parameters"`
 }
 
 type anthropicContentBlock struct {
 	Type      string                `json:"type"`
 	Text      string                `json:"text,omitempty"`
 	Source    *anthropicImageSource `json:"source,omitempty"`
+	ImageURL  any                   `json:"image_url,omitempty"`
 	Name      string                `json:"name,omitempty"`
 	ID        string                `json:"id,omitempty"`
 	Input     map[string]any        `json:"input,omitempty"`
@@ -174,6 +190,12 @@ func convertAnthropicRequest(payload anthropicRequest) (executedChatRequest, err
 	if err != nil {
 		return executedChatRequest{}, err
 	}
+	if responseFormatInstruction := anthropicResponseFormatInstruction(payload.ResponseFormat); responseFormatInstruction != "" {
+		if systemText != "" {
+			systemText += "\n\n"
+		}
+		systemText += responseFormatInstruction
+	}
 	if systemText != "" {
 		messages = append(messages, map[string]any{
 			"role":    "system",
@@ -190,10 +212,13 @@ func convertAnthropicRequest(payload anthropicRequest) (executedChatRequest, err
 	}
 
 	return executedChatRequest{
-		Model:      payload.Model,
-		Messages:   messages,
-		Tools:      convertAnthropicTools(payload.Tools),
-		ToolChoice: convertAnthropicToolChoice(payload.ToolChoice),
+		Model:                 payload.Model,
+		Messages:              messages,
+		EnableThinking:        anthropicThinkingEnabled(payload.Thinking),
+		ReasoningEffort:       payload.ReasoningEffort,
+		NestedReasoningEffort: anthropicThinkingEffort(payload.Thinking),
+		Tools:                 convertAnthropicTools(payload.Tools),
+		ToolChoice:            convertAnthropicToolChoice(payload.ToolChoice),
 	}, nil
 }
 
@@ -284,7 +309,7 @@ func normalizeAnthropicContent(raw json.RawMessage) ([]anthropicContentBlock, er
 
 func normalizeAnthropicImage(block anthropicContentBlock) string {
 	if block.Source == nil {
-		return ""
+		return normalizeAnthropicImageURL(block.ImageURL)
 	}
 	if strings.EqualFold(block.Source.Type, "base64") && block.Source.MediaType != "" && block.Source.Data != "" {
 		return "data:" + block.Source.MediaType + ";base64," + block.Source.Data
@@ -293,6 +318,17 @@ func normalizeAnthropicImage(block anthropicContentBlock) string {
 		return strings.TrimSpace(block.Source.URL)
 	}
 	return ""
+}
+
+func normalizeAnthropicImageURL(raw any) string {
+	switch v := raw.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case map[string]any:
+		return strings.TrimSpace(fmt.Sprint(v["url"]))
+	default:
+		return ""
+	}
 }
 
 func normalizeAnthropicToolResultMessage(block anthropicContentBlock) map[string]any {
@@ -339,15 +375,23 @@ func convertAnthropicTools(tools []anthropicTool) any {
 	}
 	result := make([]any, 0, len(tools))
 	for _, tool := range tools {
-		if strings.TrimSpace(tool.Name) == "" {
+		name := strings.TrimSpace(tool.Name)
+		description := strings.TrimSpace(tool.Description)
+		parameters := tool.InputSchema
+		if tool.Function != nil {
+			name = strings.TrimSpace(tool.Function.Name)
+			description = strings.TrimSpace(tool.Function.Description)
+			parameters = tool.Function.Parameters
+		}
+		if name == "" {
 			continue
 		}
 		result = append(result, map[string]any{
 			"type": "function",
 			"function": map[string]any{
-				"name":        tool.Name,
-				"description": tool.Description,
-				"parameters":  tool.InputSchema,
+				"name":        name,
+				"description": description,
+				"parameters":  parameters,
 			},
 		})
 	}
@@ -375,9 +419,9 @@ func convertAnthropicToolChoice(raw json.RawMessage) any {
 	switch strings.ToLower(strings.TrimSpace(payload.Type)) {
 	case "auto":
 		return "auto"
-	case "any":
+	case "any", "required":
 		return "required"
-	case "tool":
+	case "tool", "function":
 		if strings.TrimSpace(payload.Name) != "" {
 			return map[string]any{
 				"type": "function",
@@ -388,6 +432,71 @@ func convertAnthropicToolChoice(raw json.RawMessage) any {
 		}
 	}
 	return nil
+}
+
+func anthropicThinkingEnabled(raw json.RawMessage) any {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil
+	}
+	switch strings.ToLower(strings.TrimSpace(fmt.Sprint(payload["type"]))) {
+	case "enabled", "thinking":
+		return true
+	case "disabled", "none":
+		return false
+	default:
+		return nil
+	}
+}
+
+func anthropicThinkingEffort(raw json.RawMessage) any {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil
+	}
+	if effort := strings.TrimSpace(fmt.Sprint(payload["effort"])); effort != "" && effort != "<nil>" {
+		return effort
+	}
+	budget := numberValue(payload["budget_tokens"])
+	switch {
+	case budget >= 8192:
+		return "high"
+	case budget > 0:
+		return "medium"
+	default:
+		return nil
+	}
+}
+
+func anthropicResponseFormatInstruction(raw json.RawMessage) string {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return ""
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	formatType := strings.ToLower(strings.TrimSpace(fmt.Sprint(payload["type"])))
+	switch formatType {
+	case "json_object":
+		return "Respond with a valid JSON object only."
+	case "json_schema":
+		if schema, ok := payload["json_schema"]; ok {
+			rawSchema, _ := json.Marshal(schema)
+			if len(rawSchema) > 0 {
+				return "Respond with JSON that conforms to this schema: " + string(rawSchema)
+			}
+		}
+		return "Respond with valid JSON that conforms to the requested schema."
+	default:
+		return ""
+	}
 }
 
 func (h *Handler) handleAnthropicNonStream(w http.ResponseWriter, body io.Reader, model string, statsModel string, toolNames []string, estimatedPromptTokens int) {
