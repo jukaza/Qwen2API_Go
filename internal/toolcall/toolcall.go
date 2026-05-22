@@ -302,6 +302,7 @@ func removeMarkupPreserveWhitespace(text string) string {
 func FormatOpenAIToolCalls(calls []ToolCall) []map[string]any {
 	result := make([]map[string]any, 0, len(calls))
 	for index, call := range calls {
+		call.Input = unwrapStringifiedJSON(call.Input).(map[string]any)
 		rawArgs, _ := json.Marshal(call.Input)
 		result = append(result, map[string]any{
 			"index": index,
@@ -314,6 +315,30 @@ func FormatOpenAIToolCalls(calls []ToolCall) []map[string]any {
 		})
 	}
 	return result
+}
+
+func unwrapStringifiedJSON(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		for k, vv := range val {
+			val[k] = unwrapStringifiedJSON(vv)
+		}
+		return val
+	case []any:
+		for i, vv := range val {
+			val[i] = unwrapStringifiedJSON(vv)
+		}
+		return val
+	case string:
+		trimmed := strings.TrimSpace(val)
+		var parsed any
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
+			return unwrapStringifiedJSON(parsed)
+		}
+		return val
+	default:
+		return val
+	}
 }
 
 func NewStreamState() *StreamState {

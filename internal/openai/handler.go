@@ -1025,8 +1025,6 @@ func (h *Handler) handleStream(w http.ResponseWriter, body io.Reader, model stri
 
 	messageID := fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano())
 	exposeThinking := h.shouldExposeThinking()
-	thinkingStarted := false
-	thinkingEnded := false
 	promptTokens, completionTokens, totalTokens := 0, 0, 0
 	var contentBuilder strings.Builder
 	toolCallsSent := false
@@ -1069,16 +1067,24 @@ func (h *Handler) handleStream(w http.ResponseWriter, body io.Reader, model stri
 		if content == "" {
 			continue
 		}
-		if isThinkingPhase(phase) && !exposeThinking {
+		if isThinkingPhase(phase) {
+			if exposeThinking {
+				writeSSE(w, map[string]any{
+					"id":      messageID,
+					"object":  "chat.completion.chunk",
+					"created": time.Now().Unix(),
+					"model":   model,
+					"choices": []map[string]any{{
+						"index":         0,
+						"delta":         map[string]any{"reasoning_content": content},
+						"finish_reason": nil,
+					}},
+				})
+				if flusher != nil {
+					flusher.Flush()
+				}
+			}
 			continue
-		}
-		if isThinkingPhase(phase) && !thinkingStarted {
-			thinkingStarted = true
-			content = "<think>\n\n" + content
-		}
-		if phase == "answer" && exposeThinking && thinkingStarted && !thinkingEnded {
-			thinkingEnded = true
-			content = "\n\n</think>\n" + content
 		}
 		h.logger.DebugModule("OPENAI", "stream delta model=%s phase=%s content=%q", model, phase, content)
 		if len(toolNames) > 0 {
@@ -1237,6 +1243,9 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, body io.Reader, model s
 		"role":    "assistant",
 		"content": result.Content,
 	}
+	if result.ReasoningContent != "" {
+		message["reasoning_content"] = result.ReasoningContent
+	}
 	if len(result.ToolCalls) > 0 {
 		if result.Content == "" {
 			message["content"] = nil
@@ -1274,7 +1283,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, body io.Reader, model s
 	})
 }
 
-func parseChatCompletionContent(rawBody []byte, exposeThinking bool) (string, int, int, int) {
+func parseChatCompletionContent(rawBody []byte, exposeThinking bool) (string, string, int, int, int) {
 	payloads := make([]map[string]any, 0)
 	trimmed := strings.TrimSpace(string(rawBody))
 
@@ -1293,9 +1302,8 @@ func parseChatCompletionContent(rawBody []byte, exposeThinking bool) (string, in
 		}
 	}
 
-	var builder strings.Builder
-	thinkingStarted := false
-	thinkingEnded := false
+	var contentBuilder strings.Builder
+	var reasoningBuilder strings.Builder
 	promptTokens, completionTokens, totalTokens := 0, 0, 0
 
 	for _, raw := range payloads {
@@ -1306,31 +1314,26 @@ func parseChatCompletionContent(rawBody []byte, exposeThinking bool) (string, in
 				continue
 			}
 			phase := extractChoicePhase(choice)
-			if isThinkingPhase(phase) && !exposeThinking {
+			if isThinkingPhase(phase) {
+				if exposeThinking {
+					reasoningBuilder.WriteString(content)
+				}
 				continue
 			}
-			if isThinkingPhase(phase) && !thinkingStarted {
-				thinkingStarted = true
-				content = "<think>\n\n" + content
-			}
-			if phase == "answer" && exposeThinking && thinkingStarted && !thinkingEnded {
-				thinkingEnded = true
-				content = "\n\n</think>\n" + content
-			}
-			builder.WriteString(content)
+			contentBuilder.WriteString(content)
 		}
 	}
 
-	if strings.TrimSpace(builder.String()) == "" {
+	if strings.TrimSpace(contentBuilder.String()) == "" {
 		for _, raw := range payloads {
 			if fallback := strings.TrimSpace(extractChatTextFromPayload(raw)); fallback != "" {
-				builder.WriteString(fallback)
+				contentBuilder.WriteString(fallback)
 				break
 			}
 		}
 	}
 
-	return strings.TrimSpace(builder.String()), promptTokens, completionTokens, totalTokens
+	return strings.TrimSpace(contentBuilder.String()), strings.TrimSpace(reasoningBuilder.String()), promptTokens, completionTokens, totalTokens
 }
 
 func collectChatChoices(payload map[string]any) []map[string]any {
