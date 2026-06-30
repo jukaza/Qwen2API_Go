@@ -128,7 +128,105 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
 
   const currentMainTab = MAIN_TABS.find((item) => item.subTabs.includes(state.activeTab)) || MAIN_TABS[0];
 
+  const [showKeyInput, setShowKeyInput] = useState(false);
+
   if (!state.verified) {
+    if (!state.telegramConfigured) {
+      return (
+        <div className="admin-login">
+          <div className="admin-login-card max-w-[450px]">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="admin-sidebar-logo">Q2</div>
+              <div>
+                <h1>{t("appName")}</h1>
+                <p className="text-[13px] text-[var(--text-secondary)] mt-1">{t("login.setupTelegramTitle")}</p>
+              </div>
+            </div>
+
+            <p className="text-[13px] text-[var(--text-muted)] mb-4">{t("login.setupTelegramDesc")}</p>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">{t("login.botTokenLabel")}</label>
+                <Input
+                  placeholder={t("login.botTokenPlaceholder")}
+                  type="text"
+                  value={state.tgBotTokenInput}
+                  onChange={(e) => actions.setTgBotTokenInput(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">{t("login.adminChatIdLabel")}</label>
+                <Input
+                  placeholder={t("login.adminChatIdPlaceholder")}
+                  type="text"
+                  value={state.tgChatIdInput}
+                  onChange={(e) => actions.setTgChatIdInput(e.target.value)}
+                  className="w-full"
+                />
+                <span className="text-[11px] text-[var(--text-muted)] mt-1 block">{t("login.chatIdHint")}</span>
+              </div>
+
+              <div className="flex gap-3 mt-2">
+                <button
+                  className="admin-btn admin-btn-primary flex-1"
+                  onClick={() => void actions.saveTelegramConfig()}
+                  disabled={!state.tgBotTokenInput || !state.tgChatIdInput}
+                >
+                  {t("login.setupSave")}
+                </button>
+              </div>
+            </div>
+
+            {state.toast ? (
+              <div
+                className={`mt-4 p-3 rounded-lg text-sm font-medium ${
+                  state.toast.type === "error"
+                    ? "bg-[var(--danger-light)] text-[var(--danger)]"
+                    : "bg-[var(--success-light)] text-[var(--success)]"
+                }`}
+              >
+                {state.toast.message}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+
+    if (state.loginStatus === "waiting") {
+      return (
+        <div className="admin-login">
+          <div className="admin-login-card max-w-[420px] text-center">
+            <div className="flex flex-col items-center justify-center gap-4 mb-6">
+              <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-[var(--primary-light)] text-[var(--primary)] animate-pulse">
+                <Brain size={32} />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold">{t("login.waitingApproval")}</h1>
+                <p className="text-[13px] text-[var(--text-secondary)] mt-2">{t("login.waitingApprovalDesc")}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[var(--bg)] rounded-lg mb-6 text-left border border-[var(--border)] text-xs text-[var(--text-secondary)] flex flex-col gap-2">
+              <div className="text-[var(--danger)] font-medium">
+                {t("login.expiresIn", { secs: state.countdown })}
+              </div>
+            </div>
+
+            <button
+              className="admin-btn admin-btn-secondary w-full"
+              onClick={() => actions.cancelTelegramLogin()}
+            >
+              {t("common.cancel")}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="admin-login">
         <div className="admin-login-card">
@@ -141,43 +239,87 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
           </div>
 
           <div className="flex flex-col gap-4">
-            <Input
-              placeholder={t("login.placeholder")}
-              type="password"
-              value={state.apiKeyInput}
-              onChange={(e) => actions.setApiKeyInput(e.target.value)}
-              className="w-full"
-            />
-            <div className="flex gap-3">
-              <button className="admin-btn admin-btn-primary flex-1" onClick={() => void actions.verifyAdmin()}>
-                <Sparkles size={16} />
-                {t("login.enter")}
-              </button>
-              <button
-                className="admin-btn admin-btn-secondary"
-                onClick={() => {
-                  actions.setApiKeyInput("");
-                  if (typeof window !== "undefined") {
-                    window.localStorage.removeItem("qwen2api-admin-key");
-                  }
-                }}
-              >
-                {t("login.clear")}
-              </button>
-            </div>
+            {!showKeyInput ? (
+              <>
+                <button
+                  className="admin-btn admin-btn-primary w-full py-3"
+                  onClick={() => void actions.startTelegramLogin()}
+                >
+                  <Sparkles size={16} />
+                  {t("login.loginViaTelegram")}
+                </button>
+
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-[var(--border)]"></div>
+                  </div>
+                  <span className="relative px-3 text-xs bg-[var(--card-bg)] text-[var(--text-muted)]">{t("login.or")}</span>
+                </div>
+
+                <button
+                  className="text-xs font-medium text-[var(--primary)] hover:underline text-center"
+                  onClick={() => setShowKeyInput(true)}
+                >
+                  {t("login.enter")}
+                </button>
+              </>
+            ) : (
+              <>
+                <Input
+                  placeholder={t("login.placeholder")}
+                  type="password"
+                  value={state.apiKeyInput}
+                  onChange={(e) => actions.setApiKeyInput(e.target.value)}
+                  className="w-full"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button className="admin-btn admin-btn-primary flex-1" onClick={() => void actions.verifyAdmin()}>
+                    {t("common.confirm")}
+                  </button>
+                  <button
+                    className="admin-btn admin-btn-secondary"
+                    onClick={() => {
+                      actions.setApiKeyInput("");
+                      if (typeof window !== "undefined") {
+                        window.localStorage.removeItem("qwen2api-admin-key");
+                      }
+                    }}
+                  >
+                    {t("login.clear")}
+                  </button>
+                </div>
+
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-[var(--border)]"></div>
+                  </div>
+                  <span className="relative px-3 text-xs bg-[var(--card-bg)] text-[var(--text-muted)]">{t("login.or")}</span>
+                </div>
+
+                <button
+                  className="text-xs font-medium text-[var(--primary)] hover:underline text-center"
+                  onClick={() => setShowKeyInput(false)}
+                >
+                  {t("login.loginViaTelegram")}
+                </button>
+              </>
+            )}
           </div>
 
-          {state.toast ? (
+          {(state.loginStatus === "rejected" || state.loginStatus === "expired" || state.toast) ? (
             <div
               className={`mt-4 p-3 rounded-lg text-sm font-medium ${
-                state.toast.type === "error"
+                state.loginStatus === "rejected" || state.loginStatus === "expired" || state.toast?.type === "error"
                   ? "bg-[var(--danger-light)] text-[var(--danger)]"
-                  : state.toast.type === "success"
+                  : state.toast?.type === "success"
                   ? "bg-[var(--success-light)] text-[var(--success)]"
                   : "bg-[var(--primary-light)] text-[var(--primary)]"
               }`}
             >
-              {state.toast.message}
+              {state.loginStatus === "rejected" && t("login.loginRejected")}
+              {state.loginStatus === "expired" && t("login.loginExpired")}
+              {!(state.loginStatus === "rejected" || state.loginStatus === "expired") && state.toast?.message}
             </div>
           ) : null}
         </div>

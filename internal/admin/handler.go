@@ -2,8 +2,11 @@ package admin
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -19,30 +22,35 @@ import (
 	"qwen2api/internal/openai"
 	"qwen2api/internal/prompts"
 	"qwen2api/internal/storage"
+	"qwen2api/internal/telegram"
 )
 
 type Handler struct {
-	cfg      config.Config
-	runtime  *config.Runtime
-	keyring  *auth.Keyring
-	accounts *account.Service
-	openai   *openai.Handler
-	metrics  *metrics.DashboardStats
-	logger   *logging.Logger
+	cfg       config.Config
+	runtime   *config.Runtime
+	keyring   *auth.Keyring
+	accounts  *account.Service
+	openai    *openai.Handler
+	metrics   *metrics.DashboardStats
+	logger    *logging.Logger
+	sessions  storage.SessionStore
+	tgService *telegram.Service
 
 	batches *batchManager
 }
 
-func NewHandler(cfg config.Config, runtime *config.Runtime, keyring *auth.Keyring, accounts *account.Service, openaiHandler *openai.Handler, stats *metrics.DashboardStats, logger *logging.Logger) *Handler {
+func NewHandler(cfg config.Config, runtime *config.Runtime, keyring *auth.Keyring, accounts *account.Service, openaiHandler *openai.Handler, stats *metrics.DashboardStats, logger *logging.Logger, sessions storage.SessionStore, tgService *telegram.Service) *Handler {
 	return &Handler{
-		cfg:      cfg,
-		runtime:  runtime,
-		keyring:  keyring,
-		accounts: accounts,
-		openai:   openaiHandler,
-		metrics:  stats,
-		logger:   logger,
-		batches:  newBatchManager(),
+		cfg:       cfg,
+		runtime:   runtime,
+		keyring:   keyring,
+		accounts:  accounts,
+		openai:    openaiHandler,
+		metrics:   stats,
+		logger:    logger,
+		sessions:  sessions,
+		tgService: tgService,
+		batches:   newBatchManager(),
 	}
 }
 
@@ -66,6 +74,16 @@ func (h *Handler) HandleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	result := h.keyring.Validate(payload.APIKey)
 	if !result.IsValid {
+		if h.sessions != nil && strings.HasPrefix(payload.APIKey, "sess-") {
+			if sess, err := h.sessions.GetSession(payload.APIKey); err == nil && sess.IsValid() {
+				writeJSON(w, http.StatusOK, map[string]any{
+					"status":  200,
+					"message": "success",
+					"isAdmin": true,
+				})
+				return
+			}
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"status": 401, "message": "Unauthorized"})
 		return
 	}
@@ -1040,4 +1058,168 @@ func (h *Handler) HandleDashboardStream(w http.ResponseWriter, r *http.Request) 
 			flusher.Flush()
 		}
 	}
+}
+
+func (h *Handler) HandleTelegramConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"configured": h.cfg.TelegramBotToken != "",
+		})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		if h.cfg.TelegramBotToken != "" {
+			apiKey := auth.ExtractAPIKey(r)
+			result := h.keyring.Validate(apiKey)
+			isAdmin := result.IsValid && result.IsAdmin
+			if !isAdmin && h.sessions != nil && strings.HasPrefix(apiKey, "sess-") {
+				if sess, err := h.sessions.GetSession(apiKey); err == nil && sess.IsValid() {
+					isAdmin = true
+				}
+			}
+			if !isAdmin {
+				writeJSON(w, http.StatusForbidden, map[string]any{"error": "Admin access required"})
+				return
+			}
+		}
+
+		var payload struct {
+			BotToken    string `json:"botToken"`
+			AdminChatID string `json:"adminChatId"`
+		}
+		if err := decodeJSON(r, &payload); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体格式错误"})
+			return
+		}
+
+		botToken := strings.TrimSpace(payload.BotToken)
+		adminChatID := strings.TrimSpace(payload.AdminChatID)
+		if botToken == "" || adminChatID == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Token và Chat ID không được để trống"})
+			return
+		}
+
+		updates := map[string]string{
+			"TELEGRAM_BOT_TOKEN":     botToken,
+			"TELEGRAM_ADMIN_CHAT_ID": adminChatID,
+		}
+
+		if err := config.SaveDotEnvValues(config.DefaultEnvPath, updates); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Lưu cấu hình thất bại: " + err.Error()})
+			return
+		}
+
+		if err := config.ReloadDotEnv(config.DefaultEnvPath); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Tải lại cấu hình thất bại: " + err.Error()})
+			return
+		}
+
+		h.cfg = config.Load()
+
+		if h.tgService != nil {
+			h.tgService.Reload(h.cfg.TelegramBotToken, h.cfg.TelegramAdminChatID)
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"message": "Cấu hình Telegram Bot thành công"})
+		return
+	}
+
+	writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "Method Not Allowed"})
+}
+
+func (h *Handler) HandleTelegramLoginRequest(w http.ResponseWriter, r *http.Request) {
+	if h.cfg.TelegramBotToken == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Telegram Bot chưa được cấu hình"})
+		return
+	}
+
+	ip := clientIP(r)
+	ua := r.UserAgent()
+	reqID := "req-" + newRandomHex(8)
+
+	req := &telegram.LoginRequest{
+		ID:        reqID,
+		IP:        ip,
+		UserAgent: ua,
+		CreatedAt: time.Now(),
+		Status:    "pending",
+	}
+
+	h.tgService.GetRequestsMap().Store(reqID, req)
+
+	if err := h.tgService.SendLoginRequest(req); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Gửi yêu cầu đăng nhập qua Telegram thất bại: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"requestId": reqID})
+}
+
+func (h *Handler) HandleTelegramLoginStatus(w http.ResponseWriter, r *http.Request) {
+	requestId := strings.TrimSpace(r.URL.Query().Get("requestId"))
+	if requestId == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Thiếu requestId"})
+		return
+	}
+
+	val, ok := h.tgService.GetRequestsMap().Load(requestId)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "expired"})
+		return
+	}
+
+	req := val.(*telegram.LoginRequest)
+	if req.Status == "approved" {
+		if req.Token == "" {
+			token := "sess-" + newRandomHex(16)
+			sess := storage.Session{
+				Token:     token,
+				IP:        req.IP,
+				UserAgent: req.UserAgent,
+				CreatedAt: time.Now(),
+				ExpiresAt: time.Now().Add(30 * 24 * time.Hour), // 30 ngày
+			}
+			if err := h.sessions.SaveSession(sess); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Tạo phiên đăng nhập thất bại: " + err.Error()})
+				return
+			}
+			req.Token = token
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":       "approved",
+			"sessionToken": req.Token,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"status": req.Status})
+}
+
+func clientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+		parts := strings.Split(forwarded, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		return realIP
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil {
+		return host
+	}
+	return strings.TrimSpace(r.RemoteAddr)
+}
+
+func newRandomHex(length int) string {
+	buf := make([]byte, length)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buf)
 }

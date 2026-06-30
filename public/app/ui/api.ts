@@ -46,6 +46,21 @@ export async function apiRequestEnvelope<T>(
   });
 
   const text = await response.text();
+  const trimmedText = text.trim();
+  const isHtml = trimmedText.startsWith("<!DOCTYPE") || trimmedText.startsWith("<html") || trimmedText.startsWith("<!doctype");
+  if (isHtml && (path.startsWith("/api/") || path.startsWith("/v1/") || path === "/verify")) {
+    const errorEnvelope: ApiResponseEnvelope<unknown> = {
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      url: response.url,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: {},
+      rawText: text,
+    };
+    throw new ApiRequestError("API endpoint not found (SPA routing fallback)", errorEnvelope);
+  }
+
   const data = parseResponseText(text);
   const envelope: ApiResponseEnvelope<T> = {
     ok: response.ok,

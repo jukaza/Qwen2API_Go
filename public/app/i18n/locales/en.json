@@ -5,7 +5,23 @@
     "title": "Admin Key Login",
     "placeholder": "Enter admin API Key",
     "enter": "Enter Console",
-    "clear": "Clear"
+    "clear": "Clear",
+    "loginViaTelegram": "Login via Telegram Bot",
+    "setupTelegramTitle": "Setup Telegram Admin Bot",
+    "setupTelegramDesc": "First run detected. Please configure your Telegram Bot credentials to enable secure login.",
+    "botTokenLabel": "Telegram Bot Token",
+    "adminChatIdLabel": "Admin Chat ID",
+    "botTokenPlaceholder": "Enter Bot Token from @BotFather",
+    "adminChatIdPlaceholder": "Enter your Chat ID",
+    "setupSave": "Activate & Save Configuration",
+    "chatIdHint": "Tip: Message /start to your new Bot to retrieve your Chat ID.",
+    "waitingApproval": "Sending login request to Telegram...",
+    "waitingApprovalDesc": "Please open your Telegram app and press [Approve] to complete login.",
+    "ipAddress": "IP Address: {{ip}}",
+    "expiresIn": "Request expires in: {{secs}} seconds",
+    "loginRejected": "Login request was rejected.",
+    "loginExpired": "Login request expired.",
+    "or": "Or"
   },
   "nav": {
     "monitoring": "Monitoring",
@@ -240,7 +256,15 @@
     "size": "Size",
     "prompt": "Prompt",
     "generate": "Generate",
-    "generating": "Generating..."
+    "generating": "Generating...",
+    "reset": "Reset",
+    "resultTitle": "Video Result",
+    "resultSubtitle": "Preview, link and raw response will show here after generation.",
+    "openLink": "Open Link",
+    "copyUrl": "Copy URL",
+    "resourceUrl": "Resource URL",
+    "reqExample": "Request Example",
+    "fullJson": "Full Response JSON"
   },
   "debug": {
     "title": "Chat Debug",

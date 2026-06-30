@@ -164,7 +164,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
           </div>
         </div>
         <div className="admin-card-body flex flex-col gap-5">
-          <div className="admin-form-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "16px" }}>
             <div className="admin-form-group">
               <label>{kind === "image" ? t("images.model") : t("videos.model")}</label>
               <select className="admin-select" value={selectedModel} onChange={(event) => setModel(event.target.value)}>
@@ -225,7 +225,20 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
         </div>
         <div className="admin-card-body flex flex-col gap-5">
           <div className="asset-preview">
-            {resultUrl && kind === "image" ? <img src={resultUrl} alt="AI generated" /> : null}
+            {resultUrl && kind === "image" ? (
+              <img
+                src={`/api/proxy-image?url=${encodeURIComponent(resultUrl)}`}
+                alt="AI generated"
+                onError={(e) => {
+                  // fallback: thử load trực tiếp nếu proxy thất bại
+                  const img = e.currentTarget;
+                  if (!img.dataset.fallback) {
+                    img.dataset.fallback = "1";
+                    img.src = resultUrl;
+                  }
+                }}
+              />
+            ) : null}
             {resultUrl && kind === "video" ? <video src={resultUrl} controls playsInline /> : null}
             {!resultUrl ? (
               <div className="asset-preview-empty">

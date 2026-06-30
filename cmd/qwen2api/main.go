@@ -20,6 +20,7 @@ import (
 	"qwen2api/internal/qwen"
 	"qwen2api/internal/server"
 	"qwen2api/internal/storage"
+	"qwen2api/internal/telegram"
 )
 
 func main() {
@@ -45,6 +46,11 @@ func main() {
 		logger.ErrorModule("APP", "初始化会话存储失败: %v", err)
 		os.Exit(1)
 	}
+	sessionStore, err := storage.NewSessionStore(cfg)
+	if err != nil {
+		logger.ErrorModule("APP", "初始化Session存储失败: %v", err)
+		os.Exit(1)
+	}
 
 	keyring := auth.NewKeyring(cfg.APIKeys, cfg.AdminKey)
 	runtime := config.NewRuntime(cfg)
@@ -61,15 +67,20 @@ func main() {
 	cleanupService := cleanup.NewService(cfg, runtime, accountService, qwenClient, chatTracker, logger)
 	cleanupService.Start()
 
+	tgService := telegram.NewService(cfg.TelegramBotToken, cfg.TelegramAdminChatID, sessionStore, logger)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	tgService.Start(ctx)
+	defer tgService.Stop()
 
 	defer accountService.Close()
 	defer cleanupService.Stop()
 
 	openAIHandler := openai.NewHandler(cfg, runtime, qwenClient, accountService, conversationSessions, chatTracker, stats, logger)
-	adminHandler := admin.NewHandler(cfg, runtime, keyring, accountService, openAIHandler, stats, logger)
-	httpServer := server.New(cfg, keyring, openAIHandler, adminHandler, stats, logger)
+	adminHandler := admin.NewHandler(cfg, runtime, keyring, accountService, openAIHandler, stats, logger, sessionStore, tgService)
+	httpServer := server.New(cfg, keyring, openAIHandler, adminHandler, stats, logger, sessionStore)
 	serverErrCh := make(chan error, 1)
 
 	go func() {

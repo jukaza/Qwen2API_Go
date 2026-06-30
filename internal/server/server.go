@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,9 +21,10 @@ import (
 	"qwen2api/internal/logging"
 	"qwen2api/internal/metrics"
 	"qwen2api/internal/openai"
+	"qwen2api/internal/storage"
 )
 
-func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler, adminHandler *admin.Handler, stats *metrics.DashboardStats, logger *logging.Logger) *http.Server {
+func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler, adminHandler *admin.Handler, stats *metrics.DashboardStats, logger *logging.Logger, sessions storage.SessionStore) *http.Server {
 	mux := http.NewServeMux()
 
 	withAnyKey := func(next http.HandlerFunc) http.HandlerFunc {
@@ -29,6 +32,14 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 			apiKey := auth.ExtractAPIKey(r)
 			result := keyring.Validate(apiKey)
 			if !result.IsValid {
+				cleanKey := cleanAPIKey(apiKey)
+				if sessions != nil && strings.HasPrefix(cleanKey, "sess-") {
+					if sess, err := sessions.GetSession(cleanKey); err == nil && sess.IsValid() {
+						logger.DebugModule("AUTH", "session accepted request_id=%s path=%s method=%s", requestIDFromContext(r), r.URL.Path, r.Method)
+						next(w, r)
+						return
+					}
+				}
 				logger.WarnModule("AUTH", "auth rejected request_id=%s path=%s method=%s remote=%s reason=invalid_api_key api_key=%s", requestIDFromContext(r), r.URL.Path, r.Method, clientIP(r), logger.Mask(apiKey))
 				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "Unauthorized"})
 				return
@@ -43,6 +54,14 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 			apiKey := auth.ExtractAPIKey(r)
 			result := keyring.Validate(apiKey)
 			if !result.IsValid {
+				cleanKey := cleanAPIKey(apiKey)
+				if sessions != nil && strings.HasPrefix(cleanKey, "sess-") {
+					if sess, err := sessions.GetSession(cleanKey); err == nil && sess.IsValid() {
+						logger.DebugModule("AUTH", "anthropic session accepted request_id=%s path=%s method=%s", requestIDFromContext(r), r.URL.Path, r.Method)
+						next(w, r)
+						return
+					}
+				}
 				logger.WarnModule("AUTH", "anthropic auth rejected request_id=%s path=%s method=%s remote=%s reason=invalid_api_key api_key=%s", requestIDFromContext(r), r.URL.Path, r.Method, clientIP(r), logger.Mask(apiKey))
 				writeJSON(w, http.StatusUnauthorized, map[string]any{
 					"type": "error",
@@ -63,6 +82,14 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 			apiKey := auth.ExtractAPIKey(r)
 			result := keyring.Validate(apiKey)
 			if !result.IsValid || !result.IsAdmin {
+				cleanKey := cleanAPIKey(apiKey)
+				if sessions != nil && strings.HasPrefix(cleanKey, "sess-") {
+					if sess, err := sessions.GetSession(cleanKey); err == nil && sess.IsValid() {
+						logger.DebugModule("AUTH", "admin session accepted request_id=%s path=%s method=%s", requestIDFromContext(r), r.URL.Path, r.Method)
+						next(w, r)
+						return
+					}
+				}
 				logger.WarnModule("AUTH", "admin auth rejected request_id=%s path=%s method=%s remote=%s valid=%t admin=%t api_key=%s", requestIDFromContext(r), r.URL.Path, r.Method, clientIP(r), result.IsValid, result.IsAdmin, logger.Mask(apiKey))
 				writeJSON(w, http.StatusForbidden, map[string]any{"error": "Admin access required"})
 				return
@@ -87,6 +114,9 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 	}
 
 	handle("/verify", "admin", ensureMethod(http.MethodPost, adminHandler.HandleVerify))
+	handle("/api/telegram/config", "telegram", adminHandler.HandleTelegramConfig)
+	handle("/api/telegram/login-request", "telegram", ensureMethod(http.MethodPost, adminHandler.HandleTelegramLoginRequest))
+	handle("/api/telegram/login-status", "telegram", ensureMethod(http.MethodGet, adminHandler.HandleTelegramLoginStatus))
 	handle("/models", "models", ensureMethod(http.MethodGet, openAIHandler.HandleModels))
 	handle("/v1/models", "models", ensureMethod(http.MethodGet, withAnyKey(openAIHandler.HandleModels)))
 	handle("/v1/chat/completions", "chat", ensureMethod(http.MethodPost, withAnyKey(openAIHandler.HandleChatCompletion)))
@@ -123,6 +153,8 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 	handle("/api/forceRefreshAllAccounts", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleForceRefreshAllAccounts)))
 	handle("/api/batchTasks/", "admin", ensureMethod(http.MethodGet, withAdminKey(adminHandler.HandleBatchTask)))
 	handle("/api/dashboard/stream", "admin", ensureMethod(http.MethodGet, withAdminKey(adminHandler.HandleDashboardStream)))
+
+	handle("/api/proxy-image", "proxy", ensureMethod(http.MethodGet, proxyImageHandler))
 
 	publicDir := filepath.Join("public", "out")
 	staticFS := http.FileServer(http.Dir(publicDir))
@@ -242,4 +274,66 @@ func clientIP(r *http.Request) string {
 		return host
 	}
 	return strings.TrimSpace(r.RemoteAddr)
+}
+
+func cleanAPIKey(raw string) string {
+	clean := strings.TrimSpace(raw)
+	if strings.HasPrefix(strings.ToLower(clean), "bearer ") {
+		clean = strings.TrimSpace(clean[7:])
+	}
+	return clean
+}
+
+var proxyImageAllowedHosts = map[string]bool{
+	"cdn.qwenlm.ai":          true,
+	"qwenlm.ai":              true,
+	"img.alicdn.com":         true,
+	"ai-creator.oss-cn-hangzhou.aliyuncs.com": true,
+}
+
+var proxyImageClient = &http.Client{Timeout: 60 * time.Second}
+
+func proxyImageHandler(w http.ResponseWriter, r *http.Request) {
+	rawURL := strings.TrimSpace(r.URL.Query().Get("url"))
+	if rawURL == "" {
+		http.Error(w, "missing url param", http.StatusBadRequest)
+		return
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	host := strings.ToLower(parsed.Hostname())
+	allowed := false
+	for h := range proxyImageAllowedHosts {
+		if host == h || strings.HasSuffix(host, "."+h) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		http.Error(w, "host not allowed", http.StatusForbidden)
+		return
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, rawURL, nil)
+	if err != nil {
+		http.Error(w, "failed to build request", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Qwen2API-Proxy/1.0)")
+	resp, err := proxyImageClient.Do(req)
+	if err != nil {
+		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "image/jpeg"
+	}
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
 }

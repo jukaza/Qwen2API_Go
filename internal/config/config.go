@@ -34,6 +34,8 @@ type Config struct {
 	ProxyURL              string
 	ChatCleanupMode       int
 	PromptOverrides       map[string]string
+	TelegramBotToken      string
+	TelegramAdminChatID   string
 }
 
 func Load() Config {
@@ -75,6 +77,8 @@ func Load() Config {
 		ProxyURL:              os.Getenv("PROXY_URL"),
 		ChatCleanupMode:       getEnvInt("CHAT_CLEANUP_MODE", 0),
 		PromptOverrides:       promptOverrides,
+		TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
+		TelegramAdminChatID:   getEnv("TELEGRAM_ADMIN_CHAT_ID", ""),
 	}
 }
 

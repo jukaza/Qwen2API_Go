@@ -4,8 +4,24 @@
   "login": {
     "title": "Đăng nhập bằng mã quản trị",
     "placeholder": "Nhập API Key quản trị",
-    "enter": "Vào trang quản trị",
-    "clear": "Xóa sạch"
+    "enter": "Đăng nhập bằng Key",
+    "clear": "Xóa sạch",
+    "loginViaTelegram": "Đăng nhập qua Telegram Bot",
+    "setupTelegramTitle": "Thiết lập Telegram Bot quản trị",
+    "setupTelegramDesc": "Lần đầu khởi chạy, vui lòng nhập cấu hình Bot Telegram để kích hoạt xác thực an toàn.",
+    "botTokenLabel": "Telegram Bot Token",
+    "adminChatIdLabel": "Admin Chat ID",
+    "botTokenPlaceholder": "Nhập Bot Token từ @BotFather",
+    "adminChatIdPlaceholder": "Nhập Chat ID của bạn",
+    "setupSave": "Kích hoạt & Lưu cấu hình",
+    "chatIdHint": "Mẹo: Nhắn tin /start đến Bot mới tạo để nhận Chat ID của bạn.",
+    "waitingApproval": "Đang gửi yêu cầu đăng nhập đến Telegram...",
+    "waitingApprovalDesc": "Vui lòng mở ứng dụng Telegram của bạn và nhấn [Phê duyệt] để hoàn tất đăng nhập.",
+    "ipAddress": "Địa chỉ IP: {{ip}}",
+    "expiresIn": "Yêu cầu tự động hết hạn sau: {{secs}} giây",
+    "loginRejected": "Yêu cầu đăng nhập đã bị từ chối.",
+    "loginExpired": "Yêu cầu đăng nhập đã hết hạn.",
+    "or": "Hoặc"
   },
   "nav": {
     "monitoring": "Monitoring",
@@ -241,7 +257,15 @@
     "size": "Kích thước / Tỷ lệ",
     "prompt": "Prompt",
     "generate": "Tạo Video",
-    "generating": "Đang tạo..."
+    "generating": "Đang tạo...",
+    "reset": "Đặt lại",
+    "resultTitle": "Kết quả sinh Video",
+    "resultSubtitle": "Sau khi thành công sẽ hiển thị video xem trước, liên kết và raw JSON.",
+    "openLink": "Mở liên kết",
+    "copyUrl": "Sao chép URL",
+    "resourceUrl": "URL tài nguyên",
+    "reqExample": "Ví dụ yêu cầu",
+    "fullJson": "Raw JSON trả về"
   },
   "debug": {
     "title": "Bảng thử nghiệm API",

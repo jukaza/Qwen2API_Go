@@ -77,7 +77,7 @@ export function DebugTab({
           </div>
         </div>
         <div className="admin-card-body flex flex-col gap-5">
-          <div className="admin-form-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <div className="admin-form-group">
               <label>{t("debug.model")}</label>
               <select className="admin-select" value={selectedModel} onChange={(e) => setModel(e.target.value)}>

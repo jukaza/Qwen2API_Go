@@ -8,6 +8,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -212,12 +213,25 @@ export function DataScreenTab({
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={accountPieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+                <Pie
+                  data={accountPieData}
+                  cx="50%"
+                  cy="45%"
+                  outerRadius={75}
+                  dataKey="value"
+                  strokeWidth={0}
+                >
                   {accountPieData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
+                  formatter={(value, name) => {
+                    const numVal = typeof value === "number" ? value : 0;
+                    const total = accountPieData.reduce((s, d) => s + d.value, 0);
+                    const pct = total > 0 ? ((numVal / total) * 100).toFixed(0) : 0;
+                    return [`${numVal} (${pct}%)`, String(name)];
+                  }}
                   contentStyle={{
                     background: "var(--surface)",
                     border: "1px solid var(--border)",
@@ -225,6 +239,11 @@ export function DataScreenTab({
                     fontSize: 12,
                     color: "var(--text)",
                   }}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
                 />
               </PieChart>
             </ResponsiveContainer>

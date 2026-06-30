@@ -82,6 +82,13 @@ export function useAdminConsole(initialTab?: TabKey) {
   const [sseConnected, setSseConnected] = useState(false);
   const sseRef = useRef<EventSource | null>(null);
 
+  const [telegramConfigured, setTelegramConfigured] = useState(false);
+  const [tgBotTokenInput, setTgBotTokenInput] = useState("");
+  const [tgChatIdInput, setTgChatIdInput] = useState("");
+  const [loginRequestId, setLoginRequestId] = useState("");
+  const [loginStatus, setLoginStatus] = useState<"idle" | "waiting" | "approved" | "rejected" | "expired">("idle");
+  const [countdown, setCountdown] = useState(120);
+
   const filteredModels = useMemo(() => {
     const keyword = deferredModelKeyword.trim().toLowerCase();
     const filtered = !keyword
@@ -249,6 +256,97 @@ export function useAdminConsole(initialTab?: TabKey) {
     }
   }, [apiKey, verifyAdmin]);
 
+  const checkTelegramConfig = useCallback(async () => {
+    try {
+      const res = await apiRequest<{ configured: boolean }>("/api/telegram/config");
+      setTelegramConfigured(res.configured);
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!verified) {
+      void checkTelegramConfig();
+    }
+  }, [verified, checkTelegramConfig]);
+
+  const saveTelegramConfig = useCallback(async () => {
+    try {
+      await apiRequest<void>("/api/telegram/config", {
+        method: "POST",
+        body: JSON.stringify({ botToken: tgBotTokenInput, adminChatId: tgChatIdInput }),
+      });
+      setToast({ type: "success", message: i18n.language === "vi" ? "Đã lưu cấu hình Telegram!" : "Telegram configured successfully!" });
+      setTelegramConfigured(true);
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Cấu hình thất bại" });
+    }
+  }, [tgBotTokenInput, tgChatIdInput, i18n.language]);
+
+  const startTelegramLogin = useCallback(async () => {
+    try {
+      setLoginStatus("waiting");
+      setCountdown(120);
+      const res = await apiRequest<{ requestId: string }>("/api/telegram/login-request", { method: "POST" });
+      setLoginRequestId(res.requestId);
+    } catch (error) {
+      setLoginStatus("idle");
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Gửi yêu cầu thất bại" });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loginStatus !== "waiting" || !loginRequestId) return;
+
+    let timer: number;
+    let countdownTimer: number;
+
+    countdownTimer = window.setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setLoginStatus("expired");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const poll = async () => {
+      try {
+        const res = await apiRequest<{ status: string; sessionToken?: string }>(
+          `/api/telegram/login-status?requestId=${encodeURIComponent(loginRequestId)}`
+        );
+        if (res.status === "approved" && res.sessionToken) {
+          setLoginStatus("approved");
+          window.localStorage.setItem(STORAGE_KEY, res.sessionToken);
+          setApiKey(res.sessionToken);
+          setVerified(true);
+          setToast({
+            type: "success",
+            message: i18n.language === "vi" ? "Đăng nhập thành công!" : "Login successful!",
+          });
+          startShellTransition(() => {
+            void loadShell(res.sessionToken);
+          });
+        } else if (res.status === "rejected") {
+          setLoginStatus("rejected");
+        } else if (res.status === "expired") {
+          setLoginStatus("expired");
+        }
+      } catch {
+        // ignore errors
+      }
+    };
+
+    timer = window.setInterval(poll, 2000);
+
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(countdownTimer);
+    };
+  }, [loginStatus, loginRequestId, i18n.language, loadShell]);
+
   useEffect(() => {
     if (verified && apiKey) {
       startAccountsTransition(() => {
@@ -361,6 +459,12 @@ export function useAdminConsole(initialTab?: TabKey) {
       apiKey,
       sseConnected,
       language: i18n.language,
+      telegramConfigured,
+      tgBotTokenInput,
+      tgChatIdInput,
+      loginRequestId,
+      loginStatus,
+      countdown,
     },
     actions: {
       setApiKeyInput,
@@ -374,7 +478,14 @@ export function useAdminConsole(initialTab?: TabKey) {
           sseRef.current.close();
           sseRef.current = null;
         }
+        setLoginStatus("idle");
       },
+      setTgBotTokenInput,
+      setTgChatIdInput,
+      saveTelegramConfig,
+      startTelegramLogin,
+      cancelTelegramLogin: () => setLoginStatus("idle"),
+      setLoginStatus,
       refreshShell: () => loadShell(),
       refreshAccounts: () => loadAccounts(),
       setFilters,
