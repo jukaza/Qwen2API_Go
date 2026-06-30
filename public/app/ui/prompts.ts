@@ -7,10 +7,11 @@ export const PROMPT_IDS = {
 } as const;
 
 const FALLBACKS: Record<string, string> = {
-  [PROMPT_IDS.debugSystem]: "你是一个用于后台调试的助手，请直接、简洁地回答。",
-  [PROMPT_IDS.imageDefault]: "一张干净的产品海报，玻璃质感的 Qwen2API 标志放在桌面中央，柔和棚拍光，高清细节",
-  [PROMPT_IDS.videoDefault]: "一个发光的 Qwen2API 标志从深色工作台上缓慢升起，镜头轻微推进，科技感，流畅运动",
+  [PROMPT_IDS.debugSystem]: "Bạn là trợ lý gỡ lỗi hệ thống, hãy trả lời trực tiếp và ngắn gọn.",
+  [PROMPT_IDS.imageDefault]: "Một poster sản phẩm sạch sẽ, logo Qwen2API chất liệu kính đặt giữa mặt bàn, ánh sáng studio mềm mại, chi tiết sắc nét",
+  [PROMPT_IDS.videoDefault]: "Logo Qwen2API phát sáng từ từ nổi lên từ bàn làm việc tối, ống kính đẩy nhẹ, cảm giác công nghệ, chuyển động mượt mà",
 };
+
 
 export function promptValue(prompts: PromptsResponse | null | undefined, id: string) {
   return normalizePromptsResponse(prompts)?.data.find((item) => item.id === id)?.value ?? FALLBACKS[id] ?? "";

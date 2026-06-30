@@ -268,7 +268,8 @@
   },
   "debug": {
     "title": "Chat Debug",
-    "subtitle": "Directly call /v1/chat/completions with current Key.",
+    "subtitle": "Chat directly with any model via /v1/chat/completions with streaming & multi-turn support.",
+    "settings": "Settings",
     "model": "Model",
     "temperature": "Temperature",
     "maxTokens": "Max Tokens",
@@ -277,7 +278,7 @@
     "userMessage": "User Message",
     "send": "Send",
     "sending": "Sending...",
-    "clearResult": "Clear",
+    "clearResult": "Clear Chat",
     "modelReply": "Model Reply",
     "tokenUsage": "Token Usage",
     "input": "Input",
@@ -285,6 +286,8 @@
     "total": "Total",
     "rawJson": "Raw JSON",
     "apiOverview": "API Overview",
-    "apiOverviewSubtitle": "Common debug and ops endpoints."
+    "apiOverviewSubtitle": "Common debug and ops endpoints.",
+    "emptyTitle": "Start a conversation",
+    "emptySubtitle": "Select a model and type a message to begin."
   }
 }

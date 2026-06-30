@@ -269,16 +269,17 @@
   },
   "debug": {
     "title": "Bảng thử nghiệm API",
-    "subtitle": "Chọn model thực tế và gọi trực tiếp /v1/chat/completions để thử nghiệm kết quả hội thoại.",
+    "subtitle": "Chat trực tiếp với model thông qua /v1/chat/completions, hỗ trợ streaming & multi-turn.",
+    "settings": "Cấu hình",
     "model": "Model thử nghiệm",
     "temperature": "Temperature",
     "maxTokens": "Max Tokens",
-    "reasoningEffort": "Reasoning Effort (Mức độ suy luận)",
+    "reasoningEffort": "Reasoning Effort",
     "systemPrompt": "System Prompt",
     "userMessage": "Tin nhắn User",
-    "send": "Gửi yêu cầu thử nghiệm",
+    "send": "Gửi",
     "sending": "Đang gửi...",
-    "clearResult": "Xóa kết quả",
+    "clearResult": "Xóa chat",
     "modelReply": "Phản hồi của Model",
     "tokenUsage": "Sử dụng Token",
     "input": "Đầu vào",
@@ -286,6 +287,8 @@
     "total": "Tổng",
     "rawJson": "Raw JSON phản hồi",
     "apiOverview": "Tóm tắt API",
-    "apiOverviewSubtitle": "Các API gỡ lỗi và vận hành thường dùng nhất."
+    "apiOverviewSubtitle": "Các API gỡ lỗi và vận hành thường dùng nhất.",
+    "emptyTitle": "Bắt đầu hội thoại",
+    "emptySubtitle": "Chọn model và nhập tin nhắn để bắt đầu chat."
   }
 }
