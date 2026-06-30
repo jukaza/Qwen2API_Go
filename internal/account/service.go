@@ -178,7 +178,7 @@ func filterPersistentAccounts(accounts []storage.Account) []storage.Account {
 func decodeExpiry(token string) (int64, error) {
 	_, exp, ok := decodeJWTExpiry(token)
 	if !ok {
-		return 0, errors.New("token 无效")
+		return 0, errors.New("token không hợp lệ")
 	}
 	return exp, nil
 }
@@ -263,14 +263,14 @@ func (s *Service) ListAccounts() []storage.Account {
 
 func (s *Service) AddAccount(ctx context.Context, email, password string) error {
 	if strings.TrimSpace(email) == "" || strings.TrimSpace(password) == "" {
-		return errors.New("邮箱和密码不能为空")
+		return errors.New("email và mật khẩu không được để trống")
 	}
 
 	s.mu.RLock()
 	for _, account := range s.accounts {
 		if strings.EqualFold(account.Email, email) {
 			s.mu.RUnlock()
-			return errors.New("账号已存在")
+			return errors.New("tài khoản đã tồn tại")
 		}
 	}
 	s.mu.RUnlock()
@@ -301,7 +301,7 @@ func (s *Service) AddAccountWithToken(email, password, token string, expires int
 		if !strings.EqualFold(existing.Email, email) {
 			continue
 		}
-		return errors.New("账号已存在")
+		return errors.New("tài khoản đã tồn tại")
 	}
 	filtered := s.accounts[:0]
 	for _, existing := range s.accounts {
@@ -327,14 +327,14 @@ func (s *Service) DeleteAccount(email string) error {
 	for i, account := range s.accounts {
 		if strings.EqualFold(account.Email, email) {
 			if account.IsGuest() {
-				return errors.New("游客账号不可删除")
+				return errors.New("tài khoản khách không thể xóa")
 			}
 			index = i
 			break
 		}
 	}
 	if index == -1 {
-		return errors.New("账号不存在")
+		return errors.New("tài khoản không tồn tại")
 	}
 
 	s.accounts = append(s.accounts[:index], s.accounts[index+1:]...)
@@ -378,7 +378,7 @@ func (s *Service) RefreshAccount(ctx context.Context, email string) error {
 		s.failures[email] = 0
 		return s.store.SaveAccount(s.accounts[i])
 	}
-	return errors.New("账号不存在")
+	return errors.New("tài khoản không tồn tại")
 }
 
 func (s *Service) RefreshAllAccounts(ctx context.Context, thresholdHours int) (int, error) {
@@ -410,17 +410,17 @@ func (s *Service) GetAccountSession() (storage.Account, error) {
 	defer s.mu.Unlock()
 
 	if !s.initialized {
-		return storage.Account{}, errors.New("账户管理器尚未初始化")
+		return storage.Account{}, errors.New("trình quản lý tài khoản chưa được khởi tạo")
 	}
 	if len(s.accounts) == 0 {
-		return storage.Account{}, errors.New("没有可用的账户令牌")
+		return storage.Account{}, errors.New("không có token tài khoản khả dụng")
 	}
 
 	available := s.availableLocked()
 	if len(available) == 0 {
 		account := s.roundRobinLocked()
 		if account.Email == "" {
-			return storage.Account{}, errors.New("所有账户令牌都不可用")
+			return storage.Account{}, errors.New("tất cả các token tài khoản đều không khả dụng")
 		}
 		s.lastUsed[account.Email] = time.Now()
 		return account, nil
@@ -443,7 +443,7 @@ func (s *Service) GetAccountSessionByEmail(email string) (storage.Account, error
 	defer s.mu.Unlock()
 
 	if !s.initialized {
-		return storage.Account{}, errors.New("账户管理器尚未初始化")
+		return storage.Account{}, errors.New("trình quản lý tài khoản chưa được khởi tạo")
 	}
 	for _, account := range s.availableLocked() {
 		if strings.EqualFold(account.Email, strings.TrimSpace(email)) {
@@ -451,7 +451,7 @@ func (s *Service) GetAccountSessionByEmail(email string) (storage.Account, error
 			return account, nil
 		}
 	}
-	return storage.Account{}, errors.New("指定账号当前不可用")
+	return storage.Account{}, errors.New("tài khoản chỉ định hiện không khả dụng")
 }
 
 func (s *Service) GetAccountSessionExcluding(excluded map[string]struct{}) (storage.Account, error) {
@@ -459,10 +459,10 @@ func (s *Service) GetAccountSessionExcluding(excluded map[string]struct{}) (stor
 	defer s.mu.Unlock()
 
 	if !s.initialized {
-		return storage.Account{}, errors.New("账户管理器尚未初始化")
+		return storage.Account{}, errors.New("trình quản lý tài khoản chưa được khởi tạo")
 	}
 	if len(s.accounts) == 0 {
-		return storage.Account{}, errors.New("没有可用的账户令牌")
+		return storage.Account{}, errors.New("không có token tài khoản khả dụng")
 	}
 
 	filtered := make([]storage.Account, 0, len(s.accounts))
@@ -473,7 +473,7 @@ func (s *Service) GetAccountSessionExcluding(excluded map[string]struct{}) (stor
 		filtered = append(filtered, account)
 	}
 	if len(filtered) == 0 {
-		return storage.Account{}, errors.New("没有符合条件的可用账户令牌")
+		return storage.Account{}, errors.New("không có token tài khoản khả dụng phù hợp")
 	}
 
 	selected := filtered[0]

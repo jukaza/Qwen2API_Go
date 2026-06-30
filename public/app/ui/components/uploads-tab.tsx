@@ -33,7 +33,7 @@ export function UploadsTab({ apiKey }: { apiKey: string }) {
       );
       setResults(response.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : "Tải lên thất bại");
     } finally {
       setLoading(false);
     }
@@ -111,8 +111,8 @@ export function UploadsTab({ apiKey }: { apiKey: string }) {
         </div>
         <div className="admin-card-body flex flex-col gap-5">
           <div className="flex flex-col gap-1">
-            <EndpointItem method="POST" path="/v1/uploads" summary="Unified file upload, supports multipart, raw body, JSON base64." />
-            <EndpointItem method="POST" path="/v1/files/upload" summary="Alias for /v1/uploads." />
+            <EndpointItem method="POST" path="/v1/uploads" summary="Tải lên tệp hợp nhất, hỗ trợ dạng multipart, raw body hoặc JSON base64." />
+            <EndpointItem method="POST" path="/v1/files/upload" summary="Bí danh (alias) cho /v1/uploads." />
           </div>
 
           <pre className="admin-code">{`curl -X POST /v1/uploads \\
@@ -128,7 +128,7 @@ export function UploadsTab({ apiKey }: { apiKey: string }) {
                   <span className="text-xs text-[var(--text-secondary)]">{formatSize(item.size)}</span>
                 </div>
                 <div className="flex flex-col gap-1 text-xs text-[var(--text-secondary)]">
-                  <span>Type: {item.content_type}</span>
+                  <span>Kiểu: {item.content_type}</span>
                   <span>file_id: <span className="mono">{item.file_id}</span></span>
                   <a
                     className="text-[var(--primary)] hover:underline truncate"
@@ -141,7 +141,7 @@ export function UploadsTab({ apiKey }: { apiKey: string }) {
                 </div>
               </div>
             ))}
-            {!results.length ? <p className="text-sm text-[var(--text-muted)]">Results appear here after upload.</p> : null}
+            {!results.length ? <p className="text-sm text-[var(--text-muted)]">Kết quả tải lên sẽ xuất hiện tại đây.</p> : null}
           </div>
         </div>
       </div>

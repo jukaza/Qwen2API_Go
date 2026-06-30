@@ -22,8 +22,8 @@ export function DebugTab({
   const { t } = useTranslation();
   const availableModels = useMemo(() => models.map((item) => item.id), [models]);
   const [model, setModel] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState(defaultSystemPrompt || "You are a debugging assistant.");
-  const [message, setMessage] = useState("Hello, please introduce yourself briefly.");
+  const [systemPrompt, setSystemPrompt] = useState(defaultSystemPrompt || "Bạn là trợ lý gỡ lỗi.");
+  const [message, setMessage] = useState("Xin chào, vui lòng tự giới thiệu ngắn gọn về bản thân.");
   const [temperature, setTemperature] = useState("0.7");
   const [maxTokens, setMaxTokens] = useState("1024");
   const [reasoningEffort, setReasoningEffort] = useState<(typeof reasoningEffortOptions)[number]>("");
@@ -97,7 +97,7 @@ export function DebugTab({
             <div className="admin-form-group">
               <label>{t("debug.reasoningEffort")}</label>
               <select className="admin-select" value={reasoningEffort} onChange={(e) => setReasoningEffort(e.target.value as (typeof reasoningEffortOptions)[number])}>
-                <option value="">default</option>
+                <option value="">mặc định</option>
                 {reasoningEffortOptions.filter((item) => item).map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
@@ -136,7 +136,7 @@ export function DebugTab({
           <div className="admin-grid-2">
             <div className="admin-form-group">
               <label>{t("debug.modelReply")}</label>
-              <div className="admin-debug-box">{content || "Send a request to see model response."}</div>
+              <div className="admin-debug-box">{content || "Gửi yêu cầu để xem phản hồi của mô hình."}</div>
             </div>
             <div className="admin-form-group">
               <label>{t("debug.tokenUsage")}</label>
@@ -176,12 +176,12 @@ export function DebugTab({
           </div>
         </div>
         <div className="admin-card-body flex flex-col gap-1">
-          <EndpointItem method="POST" path="/verify" summary="Admin login verification." />
-          <EndpointItem method="GET" path="/api/dashboard/overview" summary="Dashboard overview aggregate." />
-          <EndpointItem method="GET" path="/api/getAllAccounts" summary="Server-paginated account query." />
-          <EndpointItem method="GET" path="/api/models" summary="Protected model list for debug selection." />
-          <EndpointItem method="POST" path="/v1/chat/completions" summary="Real chat debug endpoint." />
-          <EndpointItem method="POST" path="/v1/uploads" summary="OSS upload, multipart / JSON base64 / raw body." />
+          <EndpointItem method="POST" path="/verify" summary="Xác thực đăng nhập admin." />
+          <EndpointItem method="GET" path="/api/dashboard/overview" summary="Tổng hợp dữ liệu tổng quan trang quản trị." />
+          <EndpointItem method="GET" path="/api/getAllAccounts" summary="Truy vấn danh sách tài khoản phân trang từ server." />
+          <EndpointItem method="GET" path="/api/models" summary="Danh sách model bảo vệ phục vụ gỡ lỗi." />
+          <EndpointItem method="POST" path="/v1/chat/completions" summary="Endpoint gỡ lỗi hội thoại thực tế." />
+          <EndpointItem method="POST" path="/v1/uploads" summary="Tải lên OSS, hỗ trợ multipart / JSON base64 / raw body." />
 
           <pre className="admin-code mt-4">{`curl -X POST /v1/chat/completions \\
   -H "Authorization: Bearer ${apiKey ? "***" : "sk-admin"}" \\

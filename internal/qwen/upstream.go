@@ -25,7 +25,7 @@ var (
 	}
 )
 
-const alibabaHumanVerificationMessage = "触发阿里人机验证，请先在浏览器完成验证，或更换账号/IP 后重试"
+const alibabaHumanVerificationMessage = "Kích hoạt xác thực người-máy Alibaba, vui lòng hoàn thành xác thực trên trình duyệt trước, hoặc đổi tài khoản/IP rồi thử lại"
 
 type RequestOptions struct {
 	Accept      string
@@ -48,16 +48,54 @@ func (e *UpstreamError) Error() string {
 	if e == nil {
 		return ""
 	}
+	var rawMsg string
 	switch {
 	case strings.TrimSpace(e.Details) != "":
-		return e.Details
+		rawMsg = e.Details
 	case strings.TrimSpace(e.Message) != "":
-		return e.Message
+		rawMsg = e.Message
 	case strings.TrimSpace(e.Code) != "":
-		return e.Code
+		rawMsg = e.Code
 	default:
-		return "上游请求失败"
+		rawMsg = "上游请求失败"
 	}
+	return translateToVietnamese(rawMsg)
+}
+
+func translateToVietnamese(msg string) string {
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return ""
+	}
+	// Direct matches
+	switch msg {
+	case "触发阿里人机验证，请先在浏览器完成验证，或更换账号/IP 后重试":
+		return "Kích hoạt xác thực người-máy Alibaba, vui lòng hoàn thành xác thực trên trình duyệt trước, hoặc đổi tài khoản/IP rồi thử lại"
+	case "您没有权限访问此资源。请联系您的管理员以获取帮助。":
+		return "Bạn không có quyền truy cập tài nguyên này. Vui lòng liên hệ với quản trị viên để được hỗ trợ."
+	case "当前账号的该功能使用次数已达上限，请稍后再试":
+		return "Tài khoản hiện tại đã đạt giới hạn lượt dùng cho tính năng này, vui lòng thử lại sau."
+	case "上游请求失败":
+		return "Yêu cầu upstream thất bại"
+	}
+
+	// Substring / dynamic patterns
+	if strings.Contains(msg, "当前账号的该功能使用次数已达上限") {
+		hours := ""
+		parts := strings.Split(msg, "等待约")
+		if len(parts) > 1 {
+			subParts := strings.Split(parts[1], "小时")
+			if len(subParts) > 0 {
+				hours = strings.TrimSpace(subParts[0])
+			}
+		}
+		if hours != "" {
+			return "Tài khoản hiện tại đã đạt giới hạn lượt dùng cho tính năng này, vui lòng đợi khoảng " + hours + " giờ rồi thử lại."
+		}
+		return "Tài khoản hiện tại đã đạt giới hạn lượt dùng cho tính năng này, vui lòng thử lại sau."
+	}
+	
+	return msg
 }
 
 type StreamInspectionResult struct {
@@ -211,9 +249,9 @@ func normalizeUpstreamError(payload map[string]any) *UpstreamError {
 						status = http.StatusTooManyRequests
 						waitHours := strings.TrimSpace(toString(data["num"]))
 						if waitHours != "" {
-							details = "当前账号的该功能使用次数已达上限，请等待约 " + waitHours + " 小时后再试"
+							details = "Tài khoản hiện tại đã đạt giới hạn lượt dùng cho tính năng này, vui lòng đợi khoảng " + waitHours + " giờ rồi thử lại."
 						} else if details == "" {
-							details = "当前账号的该功能使用次数已达上限，请稍后再试"
+							details = "Tài khoản hiện tại đã đạt giới hạn lượt dùng cho tính năng này, vui lòng thử lại sau."
 						}
 					} else if strings.EqualFold(code, "Bad_Request") && strings.Contains(strings.ToLower(details), "internal error") {
 						status = http.StatusBadGateway

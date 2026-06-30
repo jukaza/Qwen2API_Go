@@ -52,7 +52,7 @@ export function AccountsTab({
           <div className="admin-card-header">
             <div>
               <h3>{t("accounts.addAccount")}</h3>
-              <p>Quick single account creation</p>
+              <p>Tạo nhanh một tài khoản riêng lẻ</p>
             </div>
           </div>
           <div className="admin-card-body flex flex-col gap-4">
@@ -63,7 +63,7 @@ export function AccountsTab({
               onChange={(e) => actions.setNewAccountEmail(e.target.value)}
             />
             <Input
-              placeholder="Password"
+              placeholder="Mật khẩu"
               type="password"
               value={newAccountPassword}
               onChange={(e) => actions.setNewAccountPassword(e.target.value)}
@@ -79,7 +79,7 @@ export function AccountsTab({
           <div className="admin-card-header">
             <div>
               <h3>{t("accounts.batchImport")}</h3>
-              <p>One email:password per line, async task with polling</p>
+              <p>Mỗi dòng một cặp email:mật khẩu, chạy tác vụ ngầm</p>
             </div>
           </div>
           <div className="admin-card-body flex flex-col gap-4">
@@ -102,7 +102,7 @@ export function AccountsTab({
                 </div>
                 <ProgressBar value={batchTask.progress} />
                 <div className="admin-task-meta">
-                  <span>Progress {batchTask.completed}/{batchTask.total}</span>
+                  <span>Tiến trình {batchTask.completed}/{batchTask.total}</span>
                   <span>{t("common.success")} {batchTask.success}</span>
                   <span>{t("common.failed")} {batchTask.failed}</span>
                 </div>
@@ -117,7 +117,7 @@ export function AccountsTab({
         <div className="admin-card-header">
           <SectionTitle
             title={t("accounts.accountList")}
-            description="Server-side pagination, filtering, sorting and search"
+            description="Phân trang, bộ lọc, sắp xếp và tìm kiếm từ máy chủ"
             action={
               <button className="admin-btn admin-btn-ghost admin-btn-sm" onClick={() => void actions.refreshAccounts()}>
                 <RefreshCw size={14} className={loadingAccounts ? "animate-spin" : ""} />

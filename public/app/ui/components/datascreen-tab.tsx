@@ -69,9 +69,9 @@ export function DataScreenTab({
         <h2 className="text-lg font-semibold">{t("datascreen.title")}</h2>
         <div className="flex items-center gap-3">
           {sseConnected ? (
-            <span className="datascreen-live-indicator">SSE Live</span>
+            <span className="datascreen-live-indicator">SSE Trực tiếp</span>
           ) : (
-            <span className="text-xs text-[var(--text-muted)]">Offline</span>
+            <span className="text-xs text-[var(--text-muted)]">Ngoại tuyến</span>
           )}
         </div>
       </div>

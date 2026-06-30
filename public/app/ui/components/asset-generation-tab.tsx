@@ -48,8 +48,8 @@ const VIDEO_SIZE_OPTIONS = [
 export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: AssetKind; apiKey: string; defaultPrompt?: string }) {
   const { t } = useTranslation();
   const configuredDefaultPrompt = defaultPrompt || (kind === "image"
-    ? "A clean product poster with a glass-textured Qwen2API logo on a desk, soft studio light, HD details"
-    : "A glowing Qwen2API logo slowly rising from a dark workbench, camera slightly pushing in, tech feel, smooth motion");
+    ? "Một áp phích sản phẩm sạch sẽ với logo Qwen2API vân thủy tinh trên bàn, ánh sáng studio dịu, chi tiết HD"
+    : "Logo Qwen2API phát sáng từ từ nổi lên từ bàn làm việc tối, máy ảnh đẩy nhẹ vào, cảm giác công nghệ, chuyển động mượt mà");
   const Icon = kind === "image" ? ImageIcon : Video;
   const sizeOptions = kind === "video" ? VIDEO_SIZE_OPTIONS : IMAGE_SIZE_OPTIONS;
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -79,7 +79,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
   -H "Content-Type: application/json" \\
   -d '{
     "model":"${selectedModel || modelSuffix.replace("-", "qwen-")}",
-    "prompt":"${prompt.trim() || "Describe content"}",
+    "prompt":"${prompt.trim() || "Mô tả nội dung"}",
     "size":"${selectedSize}"
   }'`,
     [apiKey, apiPath, modelSuffix, prompt, selectedModel, selectedSize],
@@ -100,7 +100,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
           return filtered[0]?.id || "";
         });
       } catch {
-        if (!cancelled) setError("Failed to load models.");
+        if (!cancelled) setError("Tải danh sách model thất bại.");
       } finally {
         if (!cancelled) setLoadingModels(false);
       }
@@ -124,10 +124,10 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
       );
       setResult(response.body);
       setRaw(JSON.stringify(response, null, 2));
-      if (!response.body.data?.[0]?.url) setError("No resource URL found.");
+      if (!response.body.data?.[0]?.url) setError("Không tìm thấy URL tài nguyên.");
     } catch (err) {
       if (err instanceof ApiRequestError) setRaw(JSON.stringify(err.response, null, 2));
-      setError(err instanceof Error ? err.message : "Generation failed.");
+      setError(err instanceof Error ? err.message : "Tạo tài nguyên thất bại.");
     } finally {
       setLoading(false);
     }
@@ -140,7 +140,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
-      setError("Copy failed, please copy manually.");
+      setError("Sao chép thất bại, vui lòng sao chép thủ công.");
     }
   }
 
@@ -148,8 +148,8 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
     return (
       <div className="asset-empty-state">
         <RefreshCw size={22} className="animate-spin" />
-        <strong>Loading models</strong>
-        <span>Please wait...</span>
+        <strong>Đang tải model</strong>
+        <span>Vui lòng đợi...</span>
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
               </select>
             </div>
             <div className="admin-form-group">
-              <label>Available</label>
+              <label>Sẵn có</label>
               <div className="asset-inline-stat">
                 <strong>{models.length}</strong>
                 <span>{modelSuffix}</span>
@@ -192,7 +192,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
 
           <div className="admin-form-group">
             <label>{t("images.prompt")}</label>
-            <textarea className="admin-textarea" rows={8} placeholder={kind === "image" ? "Describe the image..." : "Describe the video..."} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+            <textarea className="admin-textarea" rows={8} placeholder={kind === "image" ? "Mô tả hình ảnh..." : "Mô tả video..."} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -209,7 +209,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
           {!models.length ? (
             <div className="asset-alert flex items-center gap-2">
               <AlertCircle size={16} />
-              No {modelSuffix} variants in model list.
+              Không có biến thể {modelSuffix} nào trong danh sách model.
             </div>
           ) : null}
           {error ? <div className="asset-alert danger flex items-center gap-2"><AlertCircle size={16} />{error}</div> : null}
@@ -230,8 +230,8 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
             {!resultUrl ? (
               <div className="asset-preview-empty">
                 <Icon size={36} />
-                <strong>No result yet</strong>
-                <span>Submit request to see result here.</span>
+                <strong>Chưa có kết quả</strong>
+                <span>Gửi yêu cầu để xem kết quả tại đây.</span>
               </div>
             ) : null}
           </div>
@@ -251,7 +251,7 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
 
           <div className="admin-form-group">
             <label>{t("images.resourceUrl")}</label>
-            <div className="asset-url-box">{resultUrl || "Resource URL will appear after generation."}</div>
+            <div className="asset-url-box">{resultUrl || "URL tài nguyên sẽ xuất hiện sau khi tạo thành công."}</div>
           </div>
 
           <div className="admin-form-group">

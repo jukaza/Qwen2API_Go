@@ -1,44 +1,39 @@
 ---
-name: token-compression-saver
-description: Hướng dẫn Agent cách thức triển khai và tối ưu hóa bộ nén token RTK (Rich Tool Output) và cấu hình Caveman Mode trong dự án LiteRouter.
+name: qwen-api-format-stream
+description: Hướng dẫn Agent triển khai và tối ưu hóa logic dịch định dạng API giữa OpenAI/Anthropic và Qwen Chat upstream, xử lý Server-Sent Events (SSE) và nén ngữ cảnh hội thoại.
 ---
 
-# Kỹ năng Nén Dữ Liệu & Tiết Kiệm Token (Compression Skill)
+# Kỹ năng Dịch định dạng API & Xử lý Stream SSE (API translation Skill)
 
-Kỹ năng này định nghĩa các quy tắc thiết lập và phát triển hệ thống nén token đầu vào và đầu ra tại thư mục `src/lib/compression/`. Mục tiêu là tiết kiệm chi phí sử dụng API từ 20% đến 90%.
+Kỹ năng này định nghĩa các quy tắc chuyển đổi định dạng request/response tương thích OpenAI và Anthropic sang định dạng Qwen Chat Web API và ngược lại, đồng thời định cấu hình luồng Server-Sent Events (SSE) mượt mà tại thư mục `internal/openai/` và `internal/qwen/`.
 
-## 1. Bộ nén RTK Tool Saver (Nén đầu vào)
+## 1. Dịch định dạng Request và Model Mapping
 
-Bộ nén **RTK (Rich Tool Output)** chuyên xử lý các dữ liệu đầu ra cồng kềnh, lặp đi lặp lại từ các công cụ phát triển, kiểm thử hoặc hệ thống kiểm soát phiên bản trước khi gửi lên LLM.
-
-### Các loại dữ liệu cần nén:
-*   **Git Diffs:** Loại bỏ các phần metadata của git không cần thiết, nén các dòng code không đổi xung quanh thay đổi chính.
-*   **Test logs (Jest/Mocha/Go test):** Rút gọn các dòng log thành công, chỉ giữ lại chi tiết lỗi (stack traces) và kết quả tổng quan.
-*   **Grep / Search results:** Gom nhóm kết quả trùng lặp, loại bỏ khoảng trắng dư thừa và giới hạn độ dài dòng.
-*   **Terminal Output / Command logs:** Rút gọn các dòng tiến trình (progress bars), các ký tự đặc biệt ANSI điều khiển màu sắc của terminal.
+Hệ thống phải ánh xạ chính xác các tham số từ các API chuẩn (OpenAI `/v1/chat/completions`, Anthropic `/v1/messages`) sang định dạng API Web Qwen:
+*   **Model Mapping:** Ánh xạ các model ID yêu cầu từ client (ví dụ: `gpt-4o`, `claude-3-5-sonnet`, `qwen-max`) sang ID model thực tế hoặc hành vi xử lý của Qwen Web Client (ví dụ: sử dụng chế độ tìm kiếm mạng `search-info-mode`, bật/tắt `OutThink` suy nghĩ sâu).
+*   **System Prompt:** Qwen Web API hỗ trợ truyền chỉ dẫn hệ thống hoặc cấu hình tiền hội thoại. Hệ thống phải trích xuất system message từ danh sách `messages` và thiết lập cấu hình tương ứng cho Qwen.
+*   **Hội thoại nhiều lượt (Multi-turn conversations):** Chuyển đổi mảng tin nhắn `messages` (gồm các role `user`, `assistant`, `system`) sang định dạng chuỗi lịch sử hội thoại chuẩn của Qwen Web API.
 
 ---
 
-## 2. Caveman Mode (Nén đầu ra)
+## 2. Xử lý Luồng Dữ Liệu Stream (SSE)
 
-**Caveman Mode** ép buộc mô hình LLM trả lời ngắn gọn, trực diện, loại bỏ toàn bộ các câu từ giao tiếp xã giao không mang lại giá trị kỹ thuật.
-
-### Các mức độ nén (Caveman Intensities):
-1.  **`lite` (An toàn):** Lược bỏ câu chào đầu/cuối ("Chắc chắn rồi!", "Tôi có thể giúp gì..."), giữ nguyên cấu trúc giải thích.
-2.  **`standard` (Cân bằng):** Trả lời trực diện, chỉ dùng các câu đơn ngắn, ưu tiên hiển thị code trước và giải thích sau.
-3.  **`aggressive` (Mạnh mẽ):** Ép LLM trả lời tối giản như một người tối cổ, chỉ đưa ra kết quả/code thô, lược bỏ tối đa các lời giải thích dạng văn bản.
-4.  **`ultra` (Khôi phục ngữ cảnh):** Chỉ trả lời đúng từ khóa hoặc đoạn code thay đổi duy nhất, không giải thích.
+Khi client yêu cầu phản hồi dạng luồng (`stream: true`), hệ thống phải xử lý SSE cực kỳ chuẩn xác:
+*   **Đọc và Parse SSE từ Qwen:** Qwen Web API trả về các block SSE dạng `data: {...}` chứa văn bản sinh ra theo thời gian thực (real-time). Go backend phải lắng nghe luồng response, giải mã JSON và trích xuất lượng ký tự mới (delta).
+*   **Chuyển đổi sang chunk OpenAI/Anthropic:** Bọc lượng ký tự mới vào định dạng chunk dữ liệu của OpenAI hoặc Anthropic rồi ghi trực tiếp xuống HTTP Response Writer.
+*   **Ký tự đặc biệt & Line endings:** Xử lý chính xác các ký tự đặc biệt, dấu xuống dòng (`\n`), khoảng trắng để đảm bảo nội dung hiển thị trên client không bị lỗi định dạng.
+*   **Kết thúc luồng:** Gửi chunk kết thúc luồng (`data: [DONE]`) và đóng kết nối HTTP đúng cách.
 
 ---
 
-## 3. Cơ chế hoạt động Stacked Mode (Nén kép)
+## 3. Quản lý Lịch sử Hội thoại & Nén Ngữ cảnh
 
-Khi kích hoạt **Stacked Mode**, hệ thống sẽ chạy chuỗi nén:
-`Dữ liệu đầu vào` &rarr; `Nén RTK` &rarr; `Áp dụng System Prompt Caveman` &rarr; `Gửi LLM`.
+*   **Giới hạn token lịch sử:** Vì Qwen Chat Web có thể bị quá tải context hoặc gặp lỗi khi lịch sử trò chuyện quá dài, Agent cần triển khai cơ chế giới hạn hoặc rút ngắn các tin nhắn cũ hơn trong lịch sử hội thoại (ví dụ: chỉ giữ lại N tin nhắn gần nhất hoặc tóm tắt nội dung cũ) để tiết kiệm token và đảm bảo độ ổn định của API.
+*   **Tối ưu hóa Prompt và System Overrides:** Hỗ trợ cấu hình Prompts ghi đè (Qwen Web2 Control Prompt) để điều khiển hành vi trả lời của Qwen, giúp kết quả đầu ra tự nhiên và tương thích tốt nhất với yêu cầu của client.
 
 ---
 
-## 4. Kỷ luật Viết code an toàn (Fail-Safe)
+## 4. Kỷ luật An toàn luồng dữ liệu (Fail-Safe)
 
-*   **Quy tắc Fail-Safe (Không làm vỡ Request):** Bộ nén token phải hoạt động độc lập và an toàn tuyệt đối. Nếu quá trình nén gặp lỗi (lỗi phân tích cú pháp, tràn bộ nhớ, Regex chạy vô hạn), hệ thống phải bắt giữ ngoại lệ (`try-catch`), **trả về nguyên bản dữ liệu gốc** và ghi nhận log lỗi. Tuyệt đối không được làm crash request của người dùng.
-*   **Bảo toàn Code:** Bộ nén RTK không được làm thay đổi cấu trúc mã nguồn hoặc dữ liệu logic quan trọng nằm trong payload, chỉ nén các log/text trang trí.
+*   **Không ngắt luồng đột ngột:** Nếu luồng xử lý stream gặp lỗi giữa chừng (ví dụ: mất kết nối upstream tạm thời), hệ thống phải cố gắng gửi chunk kết thúc an toàn kèm lý do lỗi hoặc log lỗi, không để kết nối của client bị treo vô hạn.
+*   **Giải phóng tài nguyên:** Luôn giải phóng kết nối mạng (`resp.Body.Close()`) và dọn dẹp các session trong Go `defer` block để tránh rò rỉ bộ nhớ (memory leak) hoặc file descriptor.

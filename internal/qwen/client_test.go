@@ -670,7 +670,7 @@ func TestChatCompletionsMapsAlibabaHumanVerificationTo429(t *testing.T) {
 	if upstreamErr.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("status = %d, want 429", upstreamErr.StatusCode)
 	}
-	if !strings.Contains(upstreamErr.Error(), "人机验证") {
+	if !strings.Contains(upstreamErr.Error(), "xác thực người-máy") {
 		t.Fatalf("unexpected error message: %q", upstreamErr.Error())
 	}
 }

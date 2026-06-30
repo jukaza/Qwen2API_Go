@@ -62,22 +62,22 @@ export function SettingsTab({
         <div className="admin-stat-card primary">
           <div className="label">{t("settings.enabledStrategies")}</div>
           <div className="value">{enabledStrategies}/3</div>
-          <div className="desc">Auto refresh, thinking output, model mapping</div>
+          <div className="desc">Tự động làm mới, xuất suy nghĩ (thinking), ánh xạ model</div>
         </div>
         <div className="admin-stat-card primary">
           <div className="label">{t("settings.regularKeyCount")}</div>
           <div className="value">{settings?.regularKeys.length ?? 0}</div>
-          <div className="desc">Registered regular access keys</div>
+          <div className="desc">API Key thông thường đã được đăng ký</div>
         </div>
         <div className="admin-stat-card primary">
           <div className="label">{t("settings.refreshInterval")}</div>
           <div className="value">{settings?.autoRefreshInterval ?? 21600}s</div>
-          <div className="desc">Auto token refresh interval</div>
+          <div className="desc">Chu kỳ tự động làm mới token tài khoản</div>
         </div>
         <div className="admin-stat-card primary">
           <div className="label">{t("settings.searchMode")}</div>
-          <div className="value">{settings?.searchInfoMode === "table" ? "Table" : "Text"}</div>
-          <div className="desc">Default search result presentation</div>
+          <div className="value">{settings?.searchInfoMode === "table" ? "Bảng" : "Văn bản"}</div>
+          <div className="desc">Cách hiển thị mặc định của kết quả tìm kiếm</div>
         </div>
       </div>
 
@@ -88,13 +88,13 @@ export function SettingsTab({
             <div className="admin-card-header">
               <div>
                 <h3><Settings2 size={16} className="inline mr-1" />{t("settings.strategies")}</h3>
-                <p>Strategy switches, refresh params and model mapping</p>
+                <p>Bật tắt chiến lược, tham số làm mới và cấu hình ánh xạ model</p>
               </div>
             </div>
             <div className="admin-card-body flex flex-col gap-6">
               <div>
-                <h4 className="text-sm font-semibold mb-1">Strategy Toggles</h4>
-                <p className="text-xs text-[var(--text-secondary)] mb-4">Manage high-frequency switches</p>
+                <h4 className="text-sm font-semibold mb-1">Cấu hình Bật/Tắt</h4>
+                <p className="text-xs text-[var(--text-secondary)] mb-4">Quản lý các công tắc kích hoạt tính năng chạy nhanh</p>
                 <div className="flex flex-col gap-3">
                   <SwitchCard
                     title={t("settings.autoRefresh")}
@@ -150,12 +150,12 @@ export function SettingsTab({
 
               <div>
                 <h4 className="text-sm font-semibold mb-1">{t("settings.runParams")}</h4>
-                <p className="text-xs text-[var(--text-secondary)] mb-4">Runtime parameters</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-4">Các tham số cấu hình chạy runtime</p>
                 <div className="admin-form-grid">
                   <div className="admin-form-group">
                     <label>{t("settings.refreshIntervalLabel")}</label>
                     <Input
-                      placeholder="Refresh interval (s)"
+                      placeholder="Chu kỳ làm mới (giây)"
                       type="number"
                       value={String(settings?.autoRefreshInterval ?? 21600)}
                       onChange={(e) =>
@@ -181,7 +181,7 @@ export function SettingsTab({
                   <div className="admin-form-group">
                     <label>{t("settings.batchConcurrency")}</label>
                     <Input
-                      placeholder="Batch concurrency"
+                      placeholder="Số luồng đồng thời"
                       type="number"
                       value={String(settings?.batchLoginConcurrency ?? 5)}
                       onChange={(e) =>
@@ -213,8 +213,8 @@ export function SettingsTab({
                         setSettings((c) => (c ? { ...c, searchInfoMode: e.target.value as "table" | "text" } : c))
                       }
                     >
-                      <option value="text">Text</option>
-                      <option value="table">Table</option>
+                      <option value="text">Văn bản</option>
+                      <option value="table">Bảng</option>
                     </select>
                     <button
                       className="admin-btn admin-btn-secondary admin-btn-sm self-start mt-1"
@@ -266,7 +266,7 @@ export function SettingsTab({
             <div className="admin-card-header">
               <div>
                 <h3><KeyRound size={16} className="inline mr-1" />{t("settings.apiKeys")}</h3>
-                <p>Manage regular API Keys separately</p>
+                <p>Quản lý các API Key truy cập thông thường tách biệt</p>
               </div>
             </div>
             <div className="admin-card-body flex flex-col gap-4">
@@ -305,14 +305,14 @@ export function SettingsTab({
             <div className="admin-card-header">
               <div>
                 <h3><SlidersHorizontal size={16} className="inline mr-1" />{t("settings.refreshAndReload")}</h3>
-                <p>Account refresh and .env reload</p>
+                <p>Làm mới tài khoản và tải lại tệp .env cấu hình</p>
               </div>
             </div>
             <div className="admin-card-body flex flex-col gap-5">
               <div className="admin-form-group">
                 <label>{t("settings.thresholdHours")}</label>
                 <Input
-                  placeholder="Threshold (hours)"
+                  placeholder="Ngưỡng thời gian (giờ)"
                   type="number"
                   value={thresholdHours}
                   onChange={(e) => setThresholdHours(e.target.value)}
@@ -333,7 +333,7 @@ export function SettingsTab({
               <div className="border-t border-[var(--border)] pt-4">
                 <h4 className="text-sm font-semibold mb-1">{t("settings.hotReload")}</h4>
                 <p className="text-xs text-[var(--text-secondary)] mb-3">
-                  Reload .env after manual edits
+                  Nạp lại cấu hình .env sau khi sửa đổi thủ công
                 </p>
                 <button
                   className="admin-btn admin-btn-primary"

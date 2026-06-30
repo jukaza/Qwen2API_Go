@@ -2,27 +2,27 @@ import type { Tone } from "./types";
 
 export function formatDateTime(value: string | number | null | undefined) {
   if (!value) {
-    return "未设置";
+    return "Chưa thiết lập";
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "无效时间";
+    return "Thời gian không hợp lệ";
   }
 
-  return date.toLocaleString("zh-CN", { hour12: false });
+  return date.toLocaleString("vi-VN", { hour12: false });
 }
 
 export function formatHours(hours: number) {
   if (hours < 0) {
-    return "不可用";
+    return "Không khả dụng";
   }
 
   if (hours < 1) {
-    return `${Math.round(hours * 60)} 分钟`;
+    return `${Math.round(hours * 60)} phút`;
   }
 
-  return `${hours.toFixed(hours < 10 ? 1 : 0)} 小时`;
+  return `${hours.toFixed(hours < 10 ? 1 : 0)} giờ`;
 }
 
 export function getStatusTone(status: string): Tone {

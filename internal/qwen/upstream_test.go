@@ -47,7 +47,7 @@ func TestInspectUpstreamStreamInterceptsBusinessError(t *testing.T) {
 	if result.UpstreamError.StatusCode != 429 {
 		t.Fatalf("expected status 429, got %d", result.UpstreamError.StatusCode)
 	}
-	if !strings.Contains(result.UpstreamError.Error(), "等待约 2 小时") {
+	if !strings.Contains(result.UpstreamError.Error(), "đợi khoảng 2 giờ") {
 		t.Fatalf("unexpected error message: %q", result.UpstreamError.Error())
 	}
 }
@@ -114,7 +114,7 @@ func TestNormalizeUpstreamErrorMapsAlibabaHumanVerificationTo429(t *testing.T) {
 	if result.Retryable {
 		t.Fatal("expected retryable=false")
 	}
-	if !strings.Contains(result.Error(), "人机验证") {
+	if !strings.Contains(result.Error(), "xác thực người-máy") {
 		t.Fatalf("unexpected error message: %q", result.Error())
 	}
 }

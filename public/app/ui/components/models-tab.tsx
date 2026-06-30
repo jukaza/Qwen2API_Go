@@ -53,7 +53,7 @@ export function ModelsTab({
                 className="admin-btn admin-btn-primary"
                 disabled={refreshingModels}
                 onClick={() => void refreshModels()}
-                title="Refresh models from upstream"
+                title="Tải lại danh sách model từ máy chủ"
               >
                 <RefreshCw size={16} className={refreshingModels ? "animate-spin" : ""} />
                 {t("models.refreshModels")}
@@ -97,9 +97,9 @@ export function ModelsTab({
               </div>
 
               <div className="flex flex-wrap gap-2 mb-4">
-                {model.id.includes("thinking") ? <span className="admin-tag success">Thinking</span> : null}
-                {model.id.includes("search") ? <span className="admin-tag warning">Search</span> : null}
-                {model.id.includes("image") ? <span className="admin-tag primary">Image</span> : null}
+                {model.id.includes("thinking") ? <span className="admin-tag success">Suy nghĩ</span> : null}
+                {model.id.includes("search") ? <span className="admin-tag warning">Tìm kiếm</span> : null}
+                {model.id.includes("image") ? <span className="admin-tag primary">Hình ảnh</span> : null}
                 {model.id.includes("video") ? <span className="admin-tag danger">Video</span> : null}
                 {model.usage?.totalTokens ? <span className="admin-tag success">{t("common.success")}</span> : null}
               </div>

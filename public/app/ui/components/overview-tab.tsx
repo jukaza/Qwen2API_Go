@@ -36,24 +36,24 @@ export function OverviewTab({
         <StatCard
           title={t("overview.accountTotal")}
           value={accounts?.total ?? "--"}
-          description="Paginated management"
+          description="Quản lý phân trang"
         />
         <StatCard
           title={t("overview.accountValid")}
           value={accounts?.valid ?? "--"}
-          description="Valid and rotating"
+          description="Khỏe mạnh và xoay vòng"
           tone="success"
         />
         <StatCard
           title={t("overview.accountExpiring")}
           value={accounts?.expiringSoon ?? "--"}
-          description="Recommend early refresh"
+          description="Khuyến nghị làm mới sớm"
           tone="warning"
         />
         <StatCard
           title={t("overview.modelTotal")}
           value={modelCounts.total}
-          description={`Thinking ${modelCounts.thinking} / Search ${modelCounts.search}`}
+          description={`Suy nghĩ ${modelCounts.thinking} / Tìm kiếm ${modelCounts.search}`}
           tone="danger"
         />
       </div>
@@ -63,24 +63,24 @@ export function OverviewTab({
         <StatCard
           title={t("overview.rpm")}
           value={formatCompactNumber(analytics?.rpm)}
-          description={`30m avg ${formatDecimal(analytics?.averageRpm)} rpm`}
+          description={`T.bình 30p: ${formatDecimal(analytics?.averageRpm)} rpm`}
           tone="success"
         />
         <StatCard
           title={t("overview.totalRequests")}
           value={formatCompactNumber(analytics?.totals.requests)}
-          description={`Success ${formatDecimal(analytics?.successRate, 2)}%, Errors ${formatCompactNumber(analytics?.totals.errors)}`}
+          description={`Thành công ${formatDecimal(analytics?.successRate, 2)}%, Lỗi ${formatCompactNumber(analytics?.totals.errors)}`}
         />
         <StatCard
           title={t("overview.promptTokens")}
           value={formatCompactNumber(analytics?.totals.promptTokens)}
-          description={`30m total ${formatCompactNumber(analytics?.tokens30m)}`}
+          description={`Tổng 30p: ${formatCompactNumber(analytics?.tokens30m)}`}
           tone="warning"
         />
         <StatCard
           title={t("overview.completionTokens")}
           value={formatCompactNumber(analytics?.totals.completionTokens)}
-          description={`Total ${formatCompactNumber(analytics?.totals.totalTokens)}`}
+          description={`Tổng số: ${formatCompactNumber(analytics?.totals.totalTokens)}`}
           tone="danger"
         />
       </div>
@@ -98,7 +98,7 @@ export function OverviewTab({
             <div className="admin-card-header">
               <div>
                 <h3>{t("overview.accountHealth")}</h3>
-                <p>Account pool health overview</p>
+                <p>Tổng quan sức khỏe pool tài khoản</p>
               </div>
             </div>
             <div className="admin-card-body">
@@ -117,7 +117,7 @@ export function OverviewTab({
           <div className="admin-card-header">
             <div>
               <h3>{t("overview.trafficSplit")}</h3>
-              <p>Business vs admin requests</p>
+              <p>Lưu lượng nghiệp vụ so với admin</p>
             </div>
           </div>
           <div className="admin-card-body space-y-3">
@@ -144,7 +144,7 @@ export function OverviewTab({
           <div className="admin-card-header">
             <div>
               <h3>{t("overview.serviceParams")}</h3>
-              <p>Key runtime configuration</p>
+              <p>Cấu hình vận hành chính</p>
             </div>
           </div>
           <div className="admin-card-body space-y-3">
@@ -171,7 +171,7 @@ export function OverviewTab({
           <div className="admin-card-header">
             <div>
               <h3>{t("overview.modelSupply")}</h3>
-              <p>Current model pool overview</p>
+              <p>Tổng quan danh mục model hiện có</p>
             </div>
           </div>
           <div className="admin-card-body space-y-3">
@@ -198,7 +198,7 @@ export function OverviewTab({
           <div className="admin-card-header">
             <div>
               <h3>{t("overview.keysAndTime")}</h3>
-              <p>Control panel metadata</p>
+              <p>Thông số bảng điều khiển</p>
             </div>
           </div>
           <div className="admin-card-body space-y-3">
@@ -215,10 +215,10 @@ export function OverviewTab({
               <strong>{overview?.apiKeys.regular ?? "--"}</strong>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-[var(--text-secondary)]">Generated</span>
+              <span className="text-[var(--text-secondary)]">Khởi tạo lúc</span>
               <strong>
                 {overview?.generatedAt
-                  ? new Date(overview.generatedAt).toLocaleTimeString("zh-CN", { hour12: false })
+                  ? new Date(overview.generatedAt).toLocaleTimeString("vi-VN", { hour12: false })
                   : "--"}
               </strong>
             </div>
@@ -231,7 +231,7 @@ export function OverviewTab({
         <div className="admin-card-header">
           <div>
             <h3>{t("overview.opsMetrics")}</h3>
-            <p>Operations view of traffic, accounts, models and admin</p>
+            <p>Góc nhìn vận hành: lưu lượng, tài khoản, model và admin</p>
           </div>
         </div>
         <div className="admin-card-body">

@@ -1,52 +1,50 @@
 ---
-name: router-fallback-mitm
-description: Hướng dẫn Agent triển khai logic định tuyến, combo fallback (chuyển đổi dự phòng) và dịch định dạng API (MITM) trong dự án LiteRouter.
+name: qwen-account-pool-rotation
+description: Hướng dẫn Agent triển khai logic quản lý danh sách tài khoản Qwen Chat, tự động đăng nhập, làm mới token, xoay vòng tài khoản (rotation) và xử lý lỗi/wind control trong dự án Qwen2API_Go.
 ---
 
-# Kỹ năng Định tuyến, Combo Fallback & Dịch định dạng API (Router Skill)
+# Kỹ năng Quản lý Tài khoản, Xoay vòng & Xử lý lỗi (Account Pool Skill)
 
-Kỹ năng này định nghĩa các quy tắc và cấu trúc triển khai logic định tuyến API, xử lý lỗi tự động, và dịch chuyển định dạng (OpenAI ↔ Anthropic ↔ Gemini) tại thư mục `src/lib/routing/` và `src/mitm/`.
+Kỹ năng này định nghĩa các quy tắc và cấu trúc triển khai quản lý danh sách tài khoản Qwen Chat upstream, tự động hóa luồng đăng nhập lấy token, xoay vòng tài khoản khi xử lý request chat, và đối phó với cơ chế风控 (risk control) của Qwen tại thư mục `internal/account/` và `internal/storage/`.
 
-## 1. Định nghĩa Combo & Chiến lược Định tuyến
+## 1. Quản lý Tài khoản Qwen (Account Pool)
 
-**Combo** là một nhóm các nhà cung cấp/mô hình (targets) được gộp chung dưới một ID duy nhất (ví dụ: `my-fast-combo`). Khi người dùng gọi tới Endpoint với ID mô hình này, LiteRouter sẽ tự động áp dụng chiến lược định tuyến để phân phối tải và fallback.
+Mỗi tài khoản Qwen trong hệ thống được lưu trữ với các thông tin:
+*   `Email`, `Password`: Thông tin đăng nhập gốc.
+*   `AccessToken`, `RefreshToken`: Token phiên làm việc hiện tại thu được từ Qwen.
+*   `Status`: Trạng thái hoạt động (`healthy`, `rate_limited`, `unauthorized`, `captcha_required`, `banned`).
+*   `LastUsedTime`: Thời điểm cuối cùng tài khoản được sử dụng để phân phối tải đều.
+*   `Concurrency`: Số lượng request đang chạy đồng thời trên tài khoản này để không vượt quá giới hạn cho phép.
 
-### Các chiến lược định tuyến cốt lõi:
-1.  **`priority` (Thứ tự ưu tiên):** Luôn thử target đầu tiên. Nếu gặp lỗi (Rate Limit, Server Error, Quota Exceeded), tự động chuyển sang target tiếp theo trong danh sách.
-2.  **`weighted` (Trọng số):** Phân phối ngẫu nhiên theo tỷ lệ phần trăm trọng số được cấu hình.
-3.  **`auto` (Tự động tính điểm):** Chấm điểm target dựa trên 9 yếu tố (chi phí, độ trễ p50, giới hạn quota, tình trạng circuit breaker, v.v.) để chọn ra mô hình tối ưu nhất tại thời điểm gửi request.
-4.  **`round-robin` (Vòng tròn):** Luân phiên gọi tuần tự các target trong danh sách.
-5.  **`cost-optimized` (Tối ưu chi phí):** Dựa trên số lượng token ước tính để chọn nhà cung cấp rẻ nhất.
-
----
-
-## 2. Cơ chế Fallback an toàn (Circuit Breakers)
-
-Mỗi target trong combo phải được bảo vệ bởi một **Circuit Breaker** (Bộ ngắt mạch) để tránh làm nghẽn hệ thống khi nhà cung cấp gặp sự cố liên tục.
-*   **Trạng thái `CLOSED`:** Hoạt động bình thường.
-*   **Trạng thái `OPEN`:** Tạm thời chặn target (không gửi request tới target này) trong một khoảng thời gian nhất định (ví dụ: 30 giây) sau khi target gặp lỗi liên tiếp N lần.
-*   **Trạng thái `HALF_OPEN`:** Gửi một lượng nhỏ request thử nghiệm để kiểm tra xem nhà cung cấp đã khôi phục chưa. Nếu thành công, đưa về `CLOSED`, nếu thất bại tiếp tục chuyển về `OPEN`.
+### Nguyên tắc xoay vòng (Rotation):
+*   Khi nhận được request chat, hệ thống phải chọn tài khoản từ pool dựa trên các tiêu chí: trạng thái `healthy`, thời gian sử dụng cuối cách xa nhất (Least Recently Used), và số lượng request đồng thời (`Concurrency`) chưa vượt giới hạn.
+*   Duy trì cơ chế khóa luồng ngắn (Mutex lock) khi lấy và cập nhật thông tin tài khoản từ pool để tránh race conditions giữa các request song song.
 
 ---
 
-## 3. Dịch định dạng API ở lớp MITM (`src/mitm/`)
+## 2. Đăng nhập tự động & Làm mới Session (Auth Lifecycle)
 
-LiteRouter hoạt động như một proxy trung gian, nhận yêu cầu tương thích với OpenAI `/v1/chat/completions` và chuyển đổi sang định dạng của các nhà cung cấp khác nếu cần:
-
-### Quy tắc dịch Anthropic (OpenAI ↔ Anthropic):
-*   **Request:**
-    *   Chuyển đổi `messages` của OpenAI (chứa role `system` ở đầu hoặc bất kỳ đâu) thành `system` prompt tham số riêng của Anthropic, và gộp/lọc các role `user`/`assistant` xen kẽ chuẩn chỉ.
-    *   Bản đồ hóa tham số: `max_tokens` &rarr; `max_tokens`, `temperature` &rarr; `temperature`, `stream` &rarr; `stream`.
-*   **Response:**
-    *   Bọc đầu ra `content[0].text` hoặc stream chunks của Anthropic trở lại định dạng OpenAI (`choices[0].delta.content` hoặc `choices[0].message.content`).
-
-### Quy tắc dịch Gemini (OpenAI ↔ Gemini):
-*   Tương tự, chuyển đổi `messages` thành cấu trúc `contents` với các `parts`, trích xuất `systemInstruction` và bọc kết quả trả về đúng chuẩn OpenAI.
+*   **Tự động Đăng nhập:** Khi khởi chạy hệ thống hoặc khi tài khoản chưa có token, hệ thống phải tự động thực hiện luồng đăng nhập (email/password) thông qua Qwen API Client để lấy `accessToken`.
+*   **Refresh Token:** Trước khi thực hiện request, nếu phát hiện token sắp hết hạn (dựa trên thời gian hết hạn hoặc nhận lỗi `401 Unauthorized` từ upstream), hệ thống phải tự động thực hiện luồng refresh session để lấy token mới mà không cần can thiệp thủ công.
+*   **Fail-safe khi đăng nhập thất bại:** Nếu một tài khoản đăng nhập sai thông tin liên tiếp (ví dụ: mật khẩu sai), hãy đánh dấu trạng thái tài khoản là `unauthorized` hoặc `banned` để tránh gửi request đăng nhập liên tục dẫn đến bị khóa IP/tài khoản.
 
 ---
 
-## 4. Quy ước viết code (TypeScript & Error Handling)
+## 3. Xử lý Lỗi Rate Limit (429) & Phong Khống (Risk Control)
 
-*   **Cấm bypass type check:** Tất cả các hàm chuyển đổi định dạng hoặc kiểm tra target phải định nghĩa kiểu dữ liệu Zod hoặc TypeScript rõ ràng, cấm dùng `any`.
-*   **Fail-safe:** Khi quá trình dịch định dạng hoặc định tuyến gặp lỗi ngoài ý muốn, phải có cơ chế trả về lỗi chuẩn `502 Bad Gateway` hoặc fallback sang mô hình mặc định cấu hình sẵn, không được làm sập luồng request của client.
-*   **Transaction SQLite:** Việc ghi nhận nhật ký cuộc gọi và cập nhật trạng thái lỗi target phải được lưu trực tiếp vào cơ sở dữ liệu SQLite để làm dữ liệu tính điểm.
+Qwen áp dụng các biện pháp wind control (phòng chống bot, captcha) rất nghiêm ngặt. Khi nhận kết quả từ upstream, hệ thống cần nhận diện đúng loại lỗi:
+1.  **Lỗi Rate Limit (429):**
+    *   Tự động cập nhật trạng thái tài khoản sang `rate_limited` kèm thời gian hết hạn chặn (cooldown duration).
+    *   Kích hoạt cơ chế xoay vòng tài khoản (fallback) để chọn tài khoản thay thế khác trong pool khỏe mạnh để xử lý tiếp request hiện tại của người dùng.
+2.  **Lỗi Captcha / Verification:**
+    *   Đánh dấu trạng thái tài khoản cần giải captcha (`captcha_required`).
+    *   Chuyển request sang tài khoản khác.
+3.  **Lỗi Bị Khóa Tài Khoản (Banned):**
+    *   Đánh dấu trạng thái tài khoản là `banned`.
+    *   Log cảnh báo mức `WARN` hoặc `ERROR` để người quản trị biết và thay thế tài khoản.
+
+---
+
+## 4. Kỷ luật Fail-Safe ở API Gateway
+
+*   Nếu **TẤT CẢ** tài khoản trong pool đều gặp lỗi hoặc bị giới hạn, hệ thống không được crash mà phải trả về một phản hồi lỗi HTTP chuẩn OpenAI (ví dụ: mã `429 Too Many Requests` hoặc `503 Service Unavailable`) kèm JSON body mô tả chi tiết lỗi thân thiện với API Client.

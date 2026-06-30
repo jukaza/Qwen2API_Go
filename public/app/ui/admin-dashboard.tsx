@@ -39,6 +39,7 @@ import type { TabKey } from "./types";
 import { useState } from "react";
 
 const LANG_OPTIONS = [
+  { value: "vi", label: "langVi" },
   { value: "zh", label: "langZh" },
   { value: "en", label: "langEn" },
   { value: "zh-Hant", label: "langZht" },
