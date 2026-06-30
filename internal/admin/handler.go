@@ -1032,7 +1032,7 @@ func (h *Handler) HandleDashboardStream(w http.ResponseWriter, r *http.Request) 
 						"admin":   boolToInt(keys.AdminKey != ""),
 						"regular": len(keys.RegularKeys),
 					},
-					"analytics": h.metrics.Snapshot(),
+					"analytics":   h.metrics.Snapshot(),
 					"generatedAt": time.Now().UTC().Format(time.RFC3339),
 				},
 			})

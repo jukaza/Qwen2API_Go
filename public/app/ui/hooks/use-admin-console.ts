@@ -293,6 +293,12 @@ export function useAdminConsole(initialTab?: TabKey) {
     window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = i18n.language;
+    }
+  }, [i18n.language]);
+
   async function submitAction<T = unknown>(path: string, body?: Record<string, unknown>, method = "POST") {
     if (!apiKey) return null;
     return apiRequest<T>(
@@ -318,6 +324,9 @@ export function useAdminConsole(initialTab?: TabKey) {
   const changeLanguage = useCallback(
     (lng: string) => {
       i18n.changeLanguage(lng);
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = lng;
+      }
     },
     [i18n],
   );

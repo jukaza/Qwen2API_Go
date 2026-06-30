@@ -36,14 +36,21 @@ import { DataScreenTab } from "./components/datascreen-tab";
 import { formatCompactNumber } from "./components/dashboard-charts";
 import { PROMPT_IDS, promptValue } from "./prompts";
 import type { TabKey } from "./types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+type MainTabKey = "monitoring" | "system" | "playground" | "devtools";
+
+interface MainTabItem {
+  key: MainTabKey;
+  label: string;
+  icon: React.ReactNode;
+  subTabs: TabKey[];
+  defaultTab: TabKey;
+}
 
 const LANG_OPTIONS = [
   { value: "vi", label: "langVi" },
-  { value: "zh", label: "langZh" },
   { value: "en", label: "langEn" },
-  { value: "zh-Hant", label: "langZht" },
-  { value: "ja", label: "langJa" },
 ];
 
 export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
@@ -51,18 +58,75 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
   const { state, actions } = useAdminConsole(initialTab);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const NAV_ITEMS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
-    { key: "overview", label: t("nav.overview"), icon: <LayoutDashboard size={18} /> },
-    { key: "datascreen", label: t("nav.datascreen"), icon: <Monitor size={18} /> },
-    { key: "accounts", label: t("nav.accounts"), icon: <Users size={18} /> },
-    { key: "settings", label: t("nav.settings"), icon: <Settings size={18} /> },
-    { key: "prompts", label: t("nav.prompts"), icon: <MessageSquareText size={18} /> },
-    { key: "models", label: t("nav.models"), icon: <Brain size={18} /> },
-    { key: "uploads", label: t("nav.uploads"), icon: <Upload size={18} /> },
-    { key: "images", label: t("nav.images"), icon: <ImageIcon size={18} /> },
-    { key: "videos", label: t("nav.videos"), icon: <Video size={18} /> },
-    { key: "debug", label: t("nav.debug"), icon: <Bug size={18} /> },
+  const MAIN_TABS: MainTabItem[] = [
+    {
+      key: "monitoring",
+      label: t("nav.monitoring"),
+      icon: <LayoutDashboard size={18} />,
+      subTabs: ["overview", "datascreen"],
+      defaultTab: "overview",
+    },
+    {
+      key: "system",
+      label: t("nav.system"),
+      icon: <Settings size={18} />,
+      subTabs: ["accounts", "settings", "models"],
+      defaultTab: "accounts",
+    },
+    {
+      key: "playground",
+      label: t("nav.playground"),
+      icon: <Sparkles size={18} />,
+      subTabs: ["images", "videos", "uploads"],
+      defaultTab: "images",
+    },
+    {
+      key: "devtools",
+      label: t("nav.devtools"),
+      icon: <Bug size={18} />,
+      subTabs: ["debug", "prompts"],
+      defaultTab: "debug",
+    },
   ];
+
+  const SUB_TAB_LABELS: Record<TabKey, string> = {
+    overview: t("nav.overview"),
+    datascreen: t("nav.datascreen"),
+    accounts: t("nav.accounts"),
+    settings: t("nav.settings"),
+    prompts: t("nav.prompts"),
+    models: t("nav.models"),
+    uploads: t("nav.uploads"),
+    images: t("nav.images"),
+    videos: t("nav.videos"),
+    debug: t("nav.debug"),
+  };
+
+  const [renderedTabs, setRenderedTabs] = useState<Record<TabKey, boolean>>(() => {
+    const initial = initialTab || "overview";
+    return {
+      overview: false,
+      datascreen: false,
+      accounts: false,
+      settings: false,
+      prompts: false,
+      models: false,
+      uploads: false,
+      images: false,
+      videos: false,
+      debug: false,
+      [initial]: true,
+    } as Record<TabKey, boolean>;
+  });
+
+  useEffect(() => {
+    setRenderedTabs((prev) => {
+      if (prev[state.activeTab]) return prev;
+      return { ...prev, [state.activeTab]: true };
+    });
+  }, [state.activeTab]);
+
+  const currentMainTab = MAIN_TABS.find((item) => item.subTabs.includes(state.activeTab)) || MAIN_TABS[0];
 
   if (!state.verified) {
     return (
@@ -121,7 +185,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
     );
   }
 
-  const currentTab = NAV_ITEMS.find((item) => item.key === state.activeTab);
+  const currentTabLabel = SUB_TAB_LABELS[state.activeTab] || t("appName");
 
   return (
     <div className="admin-root">
@@ -156,21 +220,24 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
         </div>
 
         <nav className="admin-sidebar-nav">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`admin-nav-item ${state.activeTab === item.key ? "active" : ""}`}
-              onClick={() => {
-                actions.setActiveTab(item.key);
-                setMobileMenuOpen(false);
-              }}
-              title={item.label}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {MAIN_TABS.map((item) => {
+            const isActive = currentMainTab.key === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={`admin-nav-item ${isActive ? "active" : ""}`}
+                onClick={() => {
+                  actions.setActiveTab(item.defaultTab);
+                  setMobileMenuOpen(false);
+                }}
+                title={item.label}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -214,7 +281,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
             >
               <Menu size={16} />
             </button>
-            <span className="admin-page-title">{currentTab?.label || t("appName")}</span>
+            <span className="admin-page-title">{currentTabLabel}</span>
           </div>
           <div className="admin-header-right">
             <div className="hidden md:flex items-center gap-6 text-sm text-[var(--text-secondary)] mr-4">
@@ -242,102 +309,150 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
 
         {/* Content */}
         <main className="admin-content">
-          {state.activeTab === "overview" ? (
-            <OverviewTab overview={state.overview} modelCounts={state.modelCounts} />
-          ) : null}
+          {/* Sub-navigation ngang */}
+          {currentMainTab.subTabs.length > 1 && (
+            <div className="flex border-b border-[var(--border)] mb-6 overflow-x-auto gap-2 pb-2 scrollbar-none">
+              {currentMainTab.subTabs.map((tabKey) => {
+                const isActive = state.activeTab === tabKey;
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    onClick={() => actions.setActiveTab(tabKey)}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 whitespace-nowrap ${
+                      isActive
+                        ? "bg-[var(--primary)] text-white shadow-sm"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--primary-light)] hover:text-[var(--primary)]"
+                    }`}
+                  >
+                    {SUB_TAB_LABELS[tabKey]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-          {state.activeTab === "datascreen" ? (
-            <DataScreenTab
-              overview={state.overview}
-              modelCounts={state.modelCounts}
-              sseConnected={state.sseConnected}
-            />
-          ) : null}
+          {renderedTabs["overview"] && (
+            <div style={{ display: state.activeTab === "overview" ? "block" : "none" }}>
+              <OverviewTab overview={state.overview} modelCounts={state.modelCounts} />
+            </div>
+          )}
 
-          {state.activeTab === "accounts" ? (
-            <AccountsTab
-              accounts={state.accounts}
-              batchTask={state.batchTask}
-              filters={state.filters}
-              draftKeyword={state.draftKeyword}
-              newAccountEmail={state.newAccountEmail}
-              newAccountPassword={state.newAccountPassword}
-              batchAccountsText={state.batchAccountsText}
-              loadingAccounts={state.loadingAccounts}
-              actions={{
-                setNewAccountEmail: actions.setNewAccountEmail,
-                setNewAccountPassword: actions.setNewAccountPassword,
-                setBatchAccountsText: actions.setBatchAccountsText,
-                createAccount: actions.createAccount,
-                createBatchTask: actions.createBatchTask,
-                refreshAccounts: actions.refreshAccounts,
-                setDraftKeyword: actions.setDraftKeyword,
-                setFilters: actions.setFilters,
-                refreshAccount: actions.refreshAccount,
-                deleteAccount: actions.deleteAccount,
-              }}
-            />
-          ) : null}
+          {renderedTabs["datascreen"] && (
+            <div style={{ display: state.activeTab === "datascreen" ? "block" : "none" }}>
+              <DataScreenTab
+                overview={state.overview}
+                modelCounts={state.modelCounts}
+                sseConnected={state.sseConnected}
+              />
+            </div>
+          )}
 
-          {state.activeTab === "settings" ? (
-            <SettingsTab
-              settings={state.settings}
-              savingSettings={state.savingSettings}
-              addKeyValue={state.addKeyValue}
-              thresholdHours={state.thresholdHours}
-              setAddKeyValue={actions.setAddKeyValue}
-              setThresholdHours={actions.setThresholdHours}
-              setSettings={actions.setSettings}
-              addRegularKey={actions.addRegularKey}
-              deleteRegularKey={actions.deleteRegularKey}
-              refreshAllAccounts={actions.refreshAllAccounts}
-              reloadRuntimeConfig={actions.reloadRuntimeConfig}
-              saveSettings={actions.saveSettings}
-              saveChatCleanupMode={actions.saveChatCleanupMode}
-            />
-          ) : null}
+          {renderedTabs["accounts"] && (
+            <div style={{ display: state.activeTab === "accounts" ? "block" : "none" }}>
+              <AccountsTab
+                accounts={state.accounts}
+                batchTask={state.batchTask}
+                filters={state.filters}
+                draftKeyword={state.draftKeyword}
+                newAccountEmail={state.newAccountEmail}
+                newAccountPassword={state.newAccountPassword}
+                batchAccountsText={state.batchAccountsText}
+                loadingAccounts={state.loadingAccounts}
+                actions={{
+                  setNewAccountEmail: actions.setNewAccountEmail,
+                  setNewAccountPassword: actions.setNewAccountPassword,
+                  setBatchAccountsText: actions.setBatchAccountsText,
+                  createAccount: actions.createAccount,
+                  createBatchTask: actions.createBatchTask,
+                  refreshAccounts: actions.refreshAccounts,
+                  setDraftKeyword: actions.setDraftKeyword,
+                  setFilters: actions.setFilters,
+                  refreshAccount: actions.refreshAccount,
+                  deleteAccount: actions.deleteAccount,
+                }}
+              />
+            </div>
+          )}
 
-          {state.activeTab === "prompts" ? (
-            <PromptsTab
-              prompts={state.prompts}
-              savingSettings={state.savingSettings}
-              savePrompts={actions.savePrompts}
-              resetPrompts={actions.resetPrompts}
-            />
-          ) : null}
+          {renderedTabs["settings"] && (
+            <div style={{ display: state.activeTab === "settings" ? "block" : "none" }}>
+              <SettingsTab
+                settings={state.settings}
+                savingSettings={state.savingSettings}
+                addKeyValue={state.addKeyValue}
+                thresholdHours={state.thresholdHours}
+                setAddKeyValue={actions.setAddKeyValue}
+                setThresholdHours={actions.setThresholdHours}
+                setSettings={actions.setSettings}
+                addRegularKey={actions.addRegularKey}
+                deleteRegularKey={actions.deleteRegularKey}
+                refreshAllAccounts={actions.refreshAllAccounts}
+                reloadRuntimeConfig={actions.reloadRuntimeConfig}
+                saveSettings={actions.saveSettings}
+                saveChatCleanupMode={actions.saveChatCleanupMode}
+              />
+            </div>
+          )}
 
-          {state.activeTab === "models" ? (
-            <ModelsTab
-              models={state.filteredModels}
-              keyword={state.modelKeyword}
-              setKeyword={actions.setModelKeyword}
-              refreshingModels={state.refreshingModels}
-              refreshModels={actions.refreshModels}
-            />
-          ) : null}
+          {renderedTabs["prompts"] && (
+            <div style={{ display: state.activeTab === "prompts" ? "block" : "none" }}>
+              <PromptsTab
+                prompts={state.prompts}
+                savingSettings={state.savingSettings}
+                savePrompts={actions.savePrompts}
+                resetPrompts={actions.resetPrompts}
+              />
+            </div>
+          )}
 
-          {state.activeTab === "uploads" ? <UploadsTab apiKey={state.apiKey} /> : null}
-          {state.activeTab === "images" ? (
-            <AssetGenerationTab
-              kind="image"
-              apiKey={state.apiKey}
-              defaultPrompt={promptValue(state.prompts, PROMPT_IDS.imageDefault)}
-            />
-          ) : null}
-          {state.activeTab === "videos" ? (
-            <AssetGenerationTab
-              kind="video"
-              apiKey={state.apiKey}
-              defaultPrompt={promptValue(state.prompts, PROMPT_IDS.videoDefault)}
-            />
-          ) : null}
-          {state.activeTab === "debug" ? (
-            <DebugTab
-              apiKey={state.apiKey}
-              models={state.filteredModels}
-              defaultSystemPrompt={promptValue(state.prompts, PROMPT_IDS.debugSystem)}
-            />
-          ) : null}
+          {renderedTabs["models"] && (
+            <div style={{ display: state.activeTab === "models" ? "block" : "none" }}>
+              <ModelsTab
+                models={state.filteredModels}
+                keyword={state.modelKeyword}
+                setKeyword={actions.setModelKeyword}
+                refreshingModels={state.refreshingModels}
+                refreshModels={actions.refreshModels}
+              />
+            </div>
+          )}
+
+          {renderedTabs["uploads"] && (
+            <div style={{ display: state.activeTab === "uploads" ? "block" : "none" }}>
+              <UploadsTab apiKey={state.apiKey} />
+            </div>
+          )}
+
+          {renderedTabs["images"] && (
+            <div style={{ display: state.activeTab === "images" ? "block" : "none" }}>
+              <AssetGenerationTab
+                kind="image"
+                apiKey={state.apiKey}
+                defaultPrompt={promptValue(state.prompts, PROMPT_IDS.imageDefault)}
+              />
+            </div>
+          )}
+
+          {renderedTabs["videos"] && (
+            <div style={{ display: state.activeTab === "videos" ? "block" : "none" }}>
+              <AssetGenerationTab
+                kind="video"
+                apiKey={state.apiKey}
+                defaultPrompt={promptValue(state.prompts, PROMPT_IDS.videoDefault)}
+              />
+            </div>
+          )}
+
+          {renderedTabs["debug"] && (
+            <div style={{ display: state.activeTab === "debug" ? "block" : "none" }}>
+              <DebugTab
+                apiKey={state.apiKey}
+                models={state.filteredModels}
+                defaultSystemPrompt={promptValue(state.prompts, PROMPT_IDS.debugSystem)}
+              />
+            </div>
+          )}
         </main>
       </div>
     </div>

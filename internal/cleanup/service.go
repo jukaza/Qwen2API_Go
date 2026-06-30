@@ -17,14 +17,14 @@ const cleanupInterval = 1 * time.Hour
 const cleanupThreshold = 24 * time.Hour
 
 type Service struct {
-	cfg        config.Config
-	runtime    *config.Runtime
-	accounts   *account.Service
-	client     *qwen.Client
-	tracker    storage.ChatTracker
-	logger     *logging.Logger
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
+	cfg      config.Config
+	runtime  *config.Runtime
+	accounts *account.Service
+	client   *qwen.Client
+	tracker  storage.ChatTracker
+	logger   *logging.Logger
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
 }
 
 func NewService(cfg config.Config, runtime *config.Runtime, accounts *account.Service, client *qwen.Client, tracker storage.ChatTracker, logger *logging.Logger) *Service {

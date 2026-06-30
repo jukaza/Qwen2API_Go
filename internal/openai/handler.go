@@ -867,14 +867,6 @@ func (h *Handler) listModelVariants(ctx context.Context, force bool) ([]map[stri
 		result = append(result, buildModelVariant(model, ""))
 		result = append(result, buildModelVariant(model, "-fast"))
 		result = append(result, buildModelVariant(model, "-thinking"))
-		if simple {
-			continue
-		}
-		if modelSupports(model.Info, "search") {
-			result = append(result, buildModelVariant(model, "-search"))
-			result = append(result, buildModelVariant(model, "-fast-search"))
-			result = append(result, buildModelVariant(model, "-thinking-search"))
-		}
 		if modelSupports(model.Info, "t2i") {
 			result = append(result, buildModelVariant(model, "-image"))
 		}
@@ -883,6 +875,14 @@ func (h *Handler) listModelVariants(ctx context.Context, force bool) ([]map[stri
 		}
 		if modelSupports(model.Info, "image_edit") {
 			result = append(result, buildModelVariant(model, "-image-edit"))
+		}
+		if simple {
+			continue
+		}
+		if modelSupports(model.Info, "search") {
+			result = append(result, buildModelVariant(model, "-search"))
+			result = append(result, buildModelVariant(model, "-fast-search"))
+			result = append(result, buildModelVariant(model, "-thinking-search"))
 		}
 	}
 	return result, nil

@@ -8,6 +8,10 @@
     "clear": "Clear"
   },
   "nav": {
+    "monitoring": "Monitoring",
+    "system": "System",
+    "playground": "Playground",
+    "devtools": "DevTools",
     "overview": "Overview",
     "datascreen": "Data Screen",
     "accounts": "Accounts",

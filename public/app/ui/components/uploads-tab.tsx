@@ -2,7 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import { Input } from "@heroui/react";
-import { Upload, X, FileUp, Link2, Copy } from "lucide-react";
+import { Upload, X, FileUp, Link2, Copy, Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { apiRequest } from "../api";
 import type { UploadItem, UploadResponse } from "../types";
@@ -36,6 +36,23 @@ export function UploadsTab({ apiKey }: { apiKey: string }) {
       setError(err instanceof Error ? err.message : "Tải lên thất bại");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function downloadFile(url: string, filename: string) {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, "_blank");
     }
   }
 
@@ -131,13 +148,22 @@ export function UploadsTab({ apiKey }: { apiKey: string }) {
                   <span>Kiểu: {item.content_type}</span>
                   <span>file_id: <span className="mono">{item.file_id}</span></span>
                   <a
-                    className="text-[var(--primary)] hover:underline truncate"
+                    className="text-[var(--primary)] hover:underline truncate mb-2"
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
                   >
                     {item.url}
                   </a>
+                  <div className="flex gap-2">
+                    <button
+                      className="admin-btn admin-btn-ghost admin-btn-sm"
+                      onClick={() => void downloadFile(item.url, item.filename)}
+                    >
+                      <Download size={14} className="mr-1" />
+                      Tải xuống
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

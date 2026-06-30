@@ -94,7 +94,7 @@ func translateToVietnamese(msg string) string {
 		}
 		return "Tài khoản hiện tại đã đạt giới hạn lượt dùng cho tính năng này, vui lòng thử lại sau."
 	}
-	
+
 	return msg
 }
 

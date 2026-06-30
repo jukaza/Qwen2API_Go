@@ -187,38 +187,82 @@ export function AccountStatusPie({
 }: {
   accounts: OverviewResponse["accounts"] | undefined;
 }) {
+  const { t } = useTranslation();
+
   const data = [
-    { name: "Valid", value: accounts?.valid || 0 },
-    { name: "Expiring", value: accounts?.expiringSoon || 0 },
-    { name: "Expired", value: accounts?.expired || 0 },
-    { name: "Invalid", value: accounts?.invalid || 0 },
+    { name: t("accounts.statusValid"), value: accounts?.valid || 0, color: "#10b981" },
+    { name: t("accounts.statusExpiring"), value: accounts?.expiringSoon || 0, color: "#f59e0b" },
+    { name: t("accounts.statusExpired"), value: accounts?.expired || 0, color: "#ef4444" },
+    { name: t("accounts.statusInvalid"), value: accounts?.invalid || 0, color: "#64748b" },
   ].filter((d) => d.value > 0);
 
-  const colors = ["#10b981", "#f59e0b", "#ef4444", "#64748b"];
+  const hasData = data.length > 0;
+  const displayData = hasData 
+    ? data 
+    : [{ name: t("accounts.statusInvalid"), value: 1, color: "var(--border)" }];
+
+  const totalAccounts = accounts 
+    ? (accounts.valid + accounts.expiringSoon + accounts.expired + accounts.invalid) 
+    : 0;
 
   return (
-    <div className="h-[220px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie data={data} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              fontSize: 12,
-              color: "var(--text)",
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="flex flex-col justify-between h-[220px]">
+      <div className="h-[135px] relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={displayData}
+              cx="50%"
+              cy="50%"
+              innerRadius={45}
+              outerRadius={65}
+              paddingAngle={hasData ? 3 : 0}
+              dataKey="value"
+            >
+              {displayData.map((item, index) => (
+                <Cell key={`cell-${index}`} fill={item.color} />
+              ))}
+            </Pie>
+            {hasData && (
+              <Tooltip
+                contentStyle={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: "var(--text)",
+                }}
+              />
+            )}
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Total</span>
+          <span className="text-xl font-semibold text-[var(--text)]">{totalAccounts}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 px-2 mt-1">
+        {data.map((item) => (
+          <div key={item.name} className="flex items-center gap-2 text-xs">
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ background: item.color }}
+            />
+            <span className="text-[var(--text-secondary)] truncate">{item.name}</span>
+            <strong className="ml-auto text-[var(--text)]">{item.value}</strong>
+          </div>
+        ))}
+        {!hasData && (
+          <div className="col-span-2 text-center text-xs text-[var(--text-muted)] mt-1">
+            Không có dữ liệu tài khoản
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
 
 export function ModelUsageBarChart({ models }: { models: { name: string; tokens: number }[] }) {
   return (
