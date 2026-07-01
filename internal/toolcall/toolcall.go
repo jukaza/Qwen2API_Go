@@ -283,6 +283,19 @@ func parseToolCallBlock(block string) ToolCall {
 			}
 			params[item[1]] = decodeXMLText(item[2])
 		}
+	} else {
+		// Fallback: Parse parameters directly from block when <ml_parameters> is missing
+		for _, item := range xmlParameterItem.FindAllStringSubmatch(block, -1) {
+			if len(item) < 4 || item[1] != item[3] {
+				continue
+			}
+			tagName := strings.ToLower(item[1])
+			// Skip the tool name tag and wrapper tags
+			if tagName == "ml_tool_name" || tagName == "tool_name" || tagName == "ml_parameters" || tagName == "parameters" || tagName == "ml_tool_call_id" || tagName == "tool_call_id" {
+				continue
+			}
+			params[item[1]] = decodeXMLText(item[2])
+		}
 	}
 
 	return ToolCall{

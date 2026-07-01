@@ -382,3 +382,75 @@ func TestCleanVisibleChunkPreservesCodeFenceAndBracketWhitespace(t *testing.T) {
 		t.Fatalf("content = %q, want %q", got2, input2)
 	}
 }
+
+func TestParseToolCallBlockFallback(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantName  string
+		wantInput map[string]any
+	}{
+		{
+			name: "With ml_parameters wrapper",
+			input: `<ml_tool_name>grep</ml_tool_name>
+<ml_parameters>
+<pattern>google|gmail</pattern>
+</ml_parameters>`,
+			wantName: "grep",
+			wantInput: map[string]any{
+				"pattern": "google|gmail",
+			},
+		},
+		{
+			name: "Without ml_parameters wrapper (fallback)",
+			input: `<ml_tool_name>grep</ml_tool_name>
+<pattern>google|gmail|oauth|account</pattern>`,
+			wantName: "grep",
+			wantInput: map[string]any{
+				"pattern": "google|gmail|oauth|account",
+			},
+		},
+		{
+			name: "With CDATA wrapper (fallback)",
+			input: `<ml_tool_name>grep</ml_tool_name>
+<pattern><![CDATA[google|gmail|oauth|account]]></pattern>`,
+			wantName: "grep",
+			wantInput: map[string]any{
+				"pattern": "google|gmail|oauth|account",
+			},
+		},
+		{
+			name:      "No parameters",
+			input:     `<ml_tool_name>grep</ml_tool_name>`,
+			wantName:  "grep",
+			wantInput: map[string]any{},
+		},
+		{
+			name: "Ignore other structural tags like ml_tool_call_id and parameters tags",
+			input: `<ml_tool_name>grep</ml_tool_name>
+<ml_tool_call_id>call_abc</ml_tool_call_id>
+<query>test</query>`,
+			wantName: "grep",
+			wantInput: map[string]any{
+				"query": "test",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseToolCallBlock(tc.input)
+			if got.Name != tc.wantName {
+				t.Errorf("Name = %q, want %q", got.Name, tc.wantName)
+			}
+			if len(got.Input) != len(tc.wantInput) {
+				t.Errorf("Input len = %d, want %d (got: %+v)", len(got.Input), len(tc.wantInput), got.Input)
+			}
+			for k, v := range tc.wantInput {
+				if got.Input[k] != v {
+					t.Errorf("Input[%q] = %q, want %q", k, got.Input[k], v)
+				}
+			}
+		})
+	}
+}
