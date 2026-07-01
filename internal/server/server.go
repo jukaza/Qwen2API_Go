@@ -166,6 +166,7 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 	handle("/api/proxy-pools/auto-bind", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleAutoBindProxies)))
 
 	handle("/api/proxy-image", "proxy", ensureMethod(http.MethodGet, proxyImageHandler))
+	handle("/api/proxy-video", "proxy", ensureMethod(http.MethodGet, proxyVideoHandler))
 
 	publicDir := filepath.Join("public", "out")
 	staticFS := http.FileServer(http.Dir(publicDir))
@@ -303,6 +304,7 @@ var proxyImageAllowedHosts = map[string]bool{
 }
 
 var proxyImageClient = &http.Client{Timeout: 60 * time.Second}
+var proxyVideoClient = &http.Client{}
 
 func proxyImageHandler(w http.ResponseWriter, r *http.Request) {
 	rawURL := strings.TrimSpace(r.URL.Query().Get("url"))
@@ -345,6 +347,70 @@ func proxyImageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
+}
+
+func proxyVideoHandler(w http.ResponseWriter, r *http.Request) {
+	rawURL := strings.TrimSpace(r.URL.Query().Get("url"))
+	if rawURL == "" {
+		http.Error(w, "missing url param", http.StatusBadRequest)
+		return
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	host := strings.ToLower(parsed.Hostname())
+	allowed := false
+	for h := range proxyImageAllowedHosts {
+		if host == h || strings.HasSuffix(host, "."+h) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		http.Error(w, "host not allowed", http.StatusForbidden)
+		return
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, rawURL, nil)
+	if err != nil {
+		http.Error(w, "failed to build request", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Qwen2API-Proxy/1.0)")
+
+	// Pass Range headers if present to support video streaming/seeking
+	if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
+
+	resp, err := proxyVideoClient.Do(req)
+	if err != nil {
+		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Copy important response headers for video streaming/partial content
+	headersToCopy := []string{
+		"Content-Type",
+		"Content-Range",
+		"Content-Length",
+		"Accept-Ranges",
+		"Cache-Control",
+	}
+	for _, h := range headersToCopy {
+		if val := resp.Header.Get(h); val != "" {
+			w.Header().Set(h, val)
+		}
+	}
+
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "video/mp4")
+	}
+
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
 }

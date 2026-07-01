@@ -239,7 +239,21 @@ export function AssetGenerationTab({ kind, apiKey, defaultPrompt }: { kind: Asse
                 }}
               />
             ) : null}
-            {resultUrl && kind === "video" ? <video src={resultUrl} controls playsInline /> : null}
+            {resultUrl && kind === "video" ? (
+              <video
+                src={`/api/proxy-video?url=${encodeURIComponent(resultUrl)}`}
+                controls
+                playsInline
+                onError={(e) => {
+                  // fallback: thử load trực tiếp nếu proxy thất bại
+                  const vid = e.currentTarget;
+                  if (!vid.dataset.fallback) {
+                    vid.dataset.fallback = "1";
+                    vid.src = resultUrl;
+                  }
+                }}
+              />
+            ) : null}
             {!resultUrl ? (
               <div className="asset-preview-empty">
                 <Icon size={36} />
