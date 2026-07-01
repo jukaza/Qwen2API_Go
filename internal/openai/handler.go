@@ -22,6 +22,7 @@ import (
 	"qwen2api/internal/logging"
 	"qwen2api/internal/metrics"
 	"qwen2api/internal/prompts"
+	"qwen2api/internal/proxy"
 	"qwen2api/internal/qwen"
 	"qwen2api/internal/storage"
 	"qwen2api/internal/toolcall"
@@ -30,26 +31,28 @@ import (
 var dataURIExpr = regexp.MustCompile(`^data:([^;]+);base64,(.*)$`)
 
 type Handler struct {
-	cfg         config.Config
-	runtime     *config.Runtime
-	qwen        *qwen.Client
-	accounts    *account.Service
-	sessions    *ConversationSessionService
-	chatTracker storage.ChatTracker
-	metrics     *metrics.DashboardStats
-	logger      *logging.Logger
+	cfg      config.Config
+	runtime  *config.Runtime
+	qwen     *qwen.Client
+	accounts *account.Service
+	sessions *ConversationSessionService
+	proxyMgr *proxy.Manager
+	chat     storage.ChatTracker
+	metrics  *metrics.DashboardStats
+	logger   *logging.Logger
 }
 
-func NewHandler(cfg config.Config, runtime *config.Runtime, qwenClient *qwen.Client, accounts *account.Service, sessions *ConversationSessionService, chatTracker storage.ChatTracker, stats *metrics.DashboardStats, logger *logging.Logger) *Handler {
+func NewHandler(cfg config.Config, runtime *config.Runtime, qwenClient *qwen.Client, accounts *account.Service, sessions *ConversationSessionService, proxyMgr *proxy.Manager, chatTracker storage.ChatTracker, stats *metrics.DashboardStats, logger *logging.Logger) *Handler {
 	return &Handler{
-		cfg:         cfg,
-		runtime:     runtime,
-		qwen:        qwenClient,
-		accounts:    accounts,
-		sessions:    sessions,
-		chatTracker: chatTracker,
-		metrics:     stats,
-		logger:      logger,
+		cfg:      cfg,
+		runtime:  runtime,
+		qwen:     qwenClient,
+		accounts: accounts,
+		sessions: sessions,
+		proxyMgr: proxyMgr,
+		chat:     chatTracker,
+		metrics:  stats,
+		logger:   logger,
 	}
 }
 
@@ -1750,6 +1753,12 @@ func (h *Handler) generateAssetWithSession(ctx context.Context, requestedModel, 
 	session, err := h.accounts.GetAccountSession()
 	if err != nil {
 		return "", err
+	}
+	if h.proxyMgr != nil {
+		p := h.proxyMgr.GetProxyForAccount(session.Email)
+		if p != nil {
+			ctx = qwen.WithProxyInfo(ctx, qwen.ProxyInfo{ProxyURL: p.ProxyURL, Type: p.Type})
+		}
 	}
 	normalizedMessages := normalizeMessages(messages, chatType, thinkingModeFast)
 	normalizedMessages, err = h.uploadInlineMedia(ctx, session.Token, normalizedMessages)

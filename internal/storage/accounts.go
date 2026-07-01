@@ -22,6 +22,7 @@ type Account struct {
 	Token    string `json:"token"`
 	Source   string `json:"source,omitempty"`
 	Expires  int64  `json:"expires"`
+	ProxyID  string `json:"proxyId,omitempty"`
 }
 
 const AccountSourceGuest = "guest"
@@ -34,6 +35,7 @@ type FileData struct {
 	DefaultHeaders       any                   `json:"defaultHeaders"`
 	DefaultCookie        any                   `json:"defaultCookie"`
 	Accounts             []Account             `json:"accounts"`
+	ProxyPools           []ProxyPool           `json:"proxyPools,omitempty"`
 	ConversationSessions []ConversationSession `json:"conversationSessions,omitempty"`
 }
 
@@ -266,6 +268,7 @@ func (s *redisStore) LoadAccounts() ([]Account, error) {
 			Email:    email,
 			Password: values["password"],
 			Token:    values["token"],
+			ProxyID:  values["proxy_id"],
 		}
 		if values["expires"] != "" {
 			if parsed, parseErr := time.Parse(time.RFC3339Nano, values["expires"]); parseErr == nil {
@@ -290,6 +293,7 @@ func (s *redisStore) SaveAccount(account Account) error {
 		"password":     account.Password,
 		"token":        account.Token,
 		"expires_unix": account.Expires,
+		"proxy_id":     account.ProxyID,
 	}
 	if account.Expires > 0 {
 		values["expires"] = time.Unix(account.Expires, 0).UTC().Format(time.RFC3339Nano)
@@ -323,6 +327,7 @@ func (s *redisStore) SaveAllAccounts(accounts []Account) error {
 			"password":     account.Password,
 			"token":        account.Token,
 			"expires_unix": account.Expires,
+			"proxy_id":     account.ProxyID,
 		}
 		if account.Expires > 0 {
 			values["expires"] = time.Unix(account.Expires, 0).UTC().Format(time.RFC3339Nano)

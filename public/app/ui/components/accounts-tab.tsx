@@ -1,12 +1,14 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import type { Dispatch, SetStateAction } from "react";
-import type { AccountItem, AccountsResponse, BatchTaskResponse, Filters } from "../types";
+
+import { useState, useEffect, type Dispatch, type SetStateAction } from "react";
+import type { AccountItem, AccountsResponse, BatchTaskResponse, Filters, ProxyPoolItem, ProxyPoolsResponse } from "../types";
 import { formatDateTime, formatHours, getStatusTone } from "../utils";
 import { SectionTitle } from "./primitives";
 import { Input, ProgressBar } from "@heroui/react";
 import { Plus, Trash2, RefreshCw, Search, Filter, ChevronLeft, ChevronRight, UserPlus, ListRestart } from "lucide-react";
+import { apiRequest } from "../api";
 
 type AccountsActions = {
   setNewAccountEmail: (value: string) => void;
@@ -22,6 +24,7 @@ type AccountsActions = {
 };
 
 export function AccountsTab({
+  apiKey,
   accounts,
   batchTask,
   filters,
@@ -32,6 +35,7 @@ export function AccountsTab({
   loadingAccounts,
   actions,
 }: {
+  apiKey: string;
   accounts: AccountsResponse | null;
   batchTask: BatchTaskResponse | null;
   filters: Filters;
@@ -43,6 +47,27 @@ export function AccountsTab({
   actions: AccountsActions;
 }) {
   const { t } = useTranslation();
+  const [proxies, setProxies] = useState<ProxyPoolItem[]>([]);
+
+  useEffect(() => {
+    if (!apiKey) return;
+    apiRequest<ProxyPoolsResponse>("/api/proxy-pools", {}, apiKey)
+      .then(res => setProxies(res.data || []))
+      .catch(console.error);
+  }, [apiKey]);
+
+  const updateAccountProxy = async (email: string, proxyId: string) => {
+    try {
+      await apiRequest("/api/accounts/update-proxy", {
+        method: "POST",
+        body: JSON.stringify({ email, proxyId })
+      }, apiKey);
+      actions.refreshAccounts();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to update proxy");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -196,6 +221,7 @@ export function AccountsTab({
                   <th>{t("accounts.expiresAt")}</th>
                   <th>{t("accounts.password")}</th>
                   <th>{t("accounts.token")}</th>
+                  <th>Proxy</th>
                   <th className="text-right">{t("accounts.actions")}</th>
                 </tr>
               </thead>
@@ -204,13 +230,15 @@ export function AccountsTab({
                   <AccountRow
                     key={account.email}
                     account={account}
+                    proxies={proxies}
+                    updateProxy={updateAccountProxy}
                     refreshAccount={actions.refreshAccount}
                     deleteAccount={actions.deleteAccount}
                   />
                 ))}
                 {!accounts?.data.length ? (
                   <tr>
-                    <td colSpan={7} className="empty">
+                    <td colSpan={8} className="empty">
                       {t("accounts.noData")}
                     </td>
                   </tr>
@@ -253,10 +281,14 @@ export function AccountsTab({
 
 function AccountRow({
   account,
+  proxies,
+  updateProxy,
   refreshAccount,
   deleteAccount,
 }: {
   account: AccountItem;
+  proxies: ProxyPoolItem[];
+  updateProxy: (email: string, proxyId: string) => Promise<void>;
   refreshAccount: (email: string) => Promise<void>;
   deleteAccount: (email: string) => Promise<void>;
 }) {
@@ -270,7 +302,19 @@ function AccountRow({
       <td>{formatHours(account.remainingHours)}</td>
       <td>{formatDateTime(account.expiresAt)}</td>
       <td className="mono">{account.password || "-"}</td>
-      <td className="mono">{account.token || "-"}</td>
+      <td className="mono truncate max-w-[120px]" title={account.token}>{account.token || "-"}</td>
+      <td>
+        <select 
+          className="admin-select text-xs py-1"
+          value={account.proxyId || ""}
+          onChange={(e) => updateProxy(account.email, e.target.value)}
+        >
+          <option value="">Auto Bind</option>
+          {proxies.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </td>
       <td className="text-right">
         <div className="flex justify-end gap-2">
           <button

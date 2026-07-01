@@ -148,11 +148,21 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 	handle("/api/setAccount", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleSetAccount)))
 	handle("/api/deleteAccount", "admin", ensureMethod(http.MethodDelete, withAdminKey(adminHandler.HandleDeleteAccount)))
 	handle("/api/setAccounts", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleSetAccounts)))
+	handle("/api/accounts/update-proxy", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleUpdateAccountProxy)))
 	handle("/api/refreshAccount", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleRefreshAccount)))
 	handle("/api/refreshAllAccounts", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleRefreshAllAccounts)))
 	handle("/api/forceRefreshAllAccounts", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleForceRefreshAllAccounts)))
 	handle("/api/batchTasks/", "admin", ensureMethod(http.MethodGet, withAdminKey(adminHandler.HandleBatchTask)))
 	handle("/api/dashboard/stream", "admin", ensureMethod(http.MethodGet, withAdminKey(adminHandler.HandleDashboardStream)))
+
+	handle("/api/proxy-pools", "admin", ensureMethod(http.MethodGet, withAdminKey(adminHandler.HandleGetProxyPools)))
+	handle("/api/proxy-pools/add", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleAddProxy)))
+	handle("/api/proxy-pools/update/", "admin", ensureMethod(http.MethodPut, withAdminKey(adminHandler.HandleUpdateProxy)))
+	handle("/api/proxy-pools/delete/", "admin", ensureMethod(http.MethodDelete, withAdminKey(adminHandler.HandleDeleteProxy)))
+	handle("/api/proxy-pools/test/", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleTestProxy)))
+	handle("/api/proxy-pools/vercel-deploy", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleVercelDeploy)))
+	handle("/api/proxy-pools/vercel-clean", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleVercelClean)))
+	handle("/api/proxy-pools/auto-bind", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleAutoBindProxies)))
 
 	handle("/api/proxy-image", "proxy", ensureMethod(http.MethodGet, proxyImageHandler))
 
@@ -285,9 +295,9 @@ func cleanAPIKey(raw string) string {
 }
 
 var proxyImageAllowedHosts = map[string]bool{
-	"cdn.qwenlm.ai":          true,
-	"qwenlm.ai":              true,
-	"img.alicdn.com":         true,
+	"cdn.qwenlm.ai":  true,
+	"qwenlm.ai":      true,
+	"img.alicdn.com": true,
 	"ai-creator.oss-cn-hangzhou.aliyuncs.com": true,
 }
 

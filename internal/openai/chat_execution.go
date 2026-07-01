@@ -205,6 +205,12 @@ func (h *Handler) sendChatWithSession(ctx context.Context, prepared preparedChat
 }
 
 func (h *Handler) sendChatWithSessionAttempt(ctx context.Context, prepared preparedChatRequest, session storage.Account, existingChatID string, incremental bool, allowGuestRefresh bool) (*executedChat, int, error) {
+	if h.proxyMgr != nil {
+		p := h.proxyMgr.GetProxyForAccount(session.Email)
+		if p != nil {
+			ctx = qwen.WithProxyInfo(ctx, qwen.ProxyInfo{ProxyURL: p.ProxyURL, Type: p.Type})
+		}
+	}
 	chatID := strings.TrimSpace(existingChatID)
 	if chatID == "" {
 		var err error
@@ -352,10 +358,10 @@ func (h *Handler) readCompletedChat(body io.Reader, model string, toolNames []st
 }
 
 func (h *Handler) recordChatUsage(accountEmail, chatID string) {
-	if h.chatTracker == nil || strings.TrimSpace(accountEmail) == "" || strings.TrimSpace(chatID) == "" {
+	if h.chat == nil || strings.TrimSpace(accountEmail) == "" || strings.TrimSpace(chatID) == "" {
 		return
 	}
-	if err := h.chatTracker.RecordChatUsage(accountEmail, chatID); err != nil && h.logger != nil {
+	if err := h.chat.RecordChatUsage(accountEmail, chatID); err != nil && h.logger != nil {
 		h.logger.WarnModule("OPENAI", "记录对话使用失败 account=%s chat_id=%s err=%v", accountEmail, chatID, err)
 	}
 }

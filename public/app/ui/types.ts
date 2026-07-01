@@ -119,6 +119,7 @@ export type AccountItem = {
   expiresAt: string | null;
   status: AccountStatus;
   remainingHours: number;
+  proxyId?: string;
 };
 
 export type AccountsResponse = {
@@ -228,6 +229,24 @@ export type ToastState = {
 
 export type Tone = "default" | "success" | "warning" | "danger";
 
-export type TabKey = "overview" | "datascreen" | "accounts" | "settings" | "prompts" | "models" | "uploads" | "debug" | "images" | "videos";
+export type TabKey = "overview" | "datascreen" | "accounts" | "settings" | "prompts" | "models" | "uploads" | "debug" | "images" | "videos" | "proxies";
+
+export type ProxyPoolItem = {
+  id: string;
+  name: string;
+  proxyUrl: string;
+  type?: string;
+  isActive: boolean;
+  strictProxy: boolean;
+  testStatus?: string;
+  lastError?: string;
+  lastTestedAt?: number;
+  createdAt: number;
+  boundConnectionCount?: number;
+};
+
+export type ProxyPoolsResponse = {
+  data: ProxyPoolItem[];
+};
 
 export type ThemeMode = "light" | "dark";

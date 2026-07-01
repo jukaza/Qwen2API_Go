@@ -14,6 +14,7 @@ import (
 
 	"qwen2api/internal/config"
 	"qwen2api/internal/logging"
+	"qwen2api/internal/proxy"
 	"qwen2api/internal/qwen"
 	"qwen2api/internal/storage"
 )
@@ -53,6 +54,7 @@ type Service struct {
 	client   *qwen.Client
 	logger   *logging.Logger
 	tokenMgr *tokenManager
+	proxyMgr *proxy.Manager
 
 	mu           sync.RWMutex
 	accounts     []storage.Account
@@ -64,14 +66,15 @@ type Service struct {
 	refreshStop chan struct{}
 }
 
-func NewService(cfg config.Config, runtime *config.Runtime, store storage.AccountStore, client *qwen.Client, logger *logging.Logger) *Service {
+func NewService(cfg config.Config, runtime *config.Runtime, store storage.AccountStore, client *qwen.Client, proxyMgr *proxy.Manager, logger *logging.Logger) *Service {
 	return &Service{
 		cfg:         cfg,
 		runtime:     runtime,
 		store:       store,
 		client:      client,
+		proxyMgr:    proxyMgr,
 		logger:      logger,
-		tokenMgr:    &tokenManager{client: client, logger: logger},
+		tokenMgr:    &tokenManager{client: client, proxyMgr: proxyMgr, logger: logger},
 		lastUsed:    map[string]time.Time{},
 		failures:    map[string]int{},
 		refreshStop: make(chan struct{}),
@@ -154,7 +157,52 @@ func (s *Service) ensureAccountReady(ctx context.Context, account storage.Accoun
 	return account, true
 }
 
+func (s *Service) UpdateAccountProxy(email string, proxyID string) error {
+	if strings.TrimSpace(email) == "" {
+		return errors.New("email cannot be empty")
+	}
+
+	accounts, err := s.store.LoadAccounts()
+	if err != nil {
+		return err
+	}
+
+	var found bool
+	for i, acc := range accounts {
+		if strings.EqualFold(acc.Email, email) {
+			accounts[i].ProxyID = proxyID
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return errors.New("account not found")
+	}
+
+	if err := s.store.SaveAllAccounts(accounts); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	for i, acc := range s.accounts {
+		if strings.EqualFold(acc.Email, email) {
+			s.accounts[i].ProxyID = proxyID
+			break
+		}
+	}
+	s.mu.Unlock()
+
+	return nil
+}
+
 func (s *Service) ensureGuestReady(ctx context.Context) (storage.Account, bool) {
+	if s.proxyMgr != nil {
+		p := s.proxyMgr.GetProxyForAccount(guestAccountEmail)
+		if p != nil {
+			ctx = qwen.WithProxyInfo(ctx, qwen.ProxyInfo{ProxyURL: p.ProxyURL, Type: p.Type})
+		}
+	}
 	if _, err := s.client.EnsureGuestCookieHeader(ctx); err != nil {
 		s.logger.WarnModule("ACCOUNT", "游客 cookie 预热失败，将在首次请求时继续重试: %v", err)
 	}
@@ -205,12 +253,19 @@ func decodeJWTExpiry(token string) (bool, int64, bool) {
 }
 
 type tokenManager struct {
-	client *qwen.Client
-	logger *logging.Logger
+	client   *qwen.Client
+	proxyMgr *proxy.Manager
+	logger   *logging.Logger
 }
 
 func (m *tokenManager) Login(ctx context.Context, email string, password string) (string, error) {
 	hash := sha256.Sum256([]byte(password))
+	if m.proxyMgr != nil {
+		p := m.proxyMgr.GetProxyForAccount(email)
+		if p != nil {
+			ctx = qwen.WithProxyInfo(ctx, qwen.ProxyInfo{ProxyURL: p.ProxyURL, Type: p.Type})
+		}
+	}
 	return m.client.SignIn(ctx, email, hex.EncodeToString(hash[:]))
 }
 

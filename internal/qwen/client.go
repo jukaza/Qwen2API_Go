@@ -26,6 +26,19 @@ import (
 	"qwen2api/internal/ssxmod"
 )
 
+type contextKey string
+
+const proxyInfoKey = contextKey("proxyInfo")
+
+type ProxyInfo struct {
+	ProxyURL string
+	Type     string
+}
+
+func WithProxyInfo(ctx context.Context, proxy ProxyInfo) context.Context {
+	return context.WithValue(ctx, proxyInfoKey, proxy)
+}
+
 const (
 	qwenWebVersion = "0.2.67"
 	qwenBxVersion  = "2.5.36"
@@ -48,11 +61,16 @@ type cookieOptions struct {
 }
 
 func NewClient(cfg config.Config, logger *logging.Logger) *Client {
-	transport := &http.Transport{}
-	if strings.TrimSpace(cfg.ProxyURL) != "" {
-		if proxyURL, err := url.Parse(cfg.ProxyURL); err == nil {
-			transport.Proxy = http.ProxyURL(proxyURL)
-		}
+	transport := &http.Transport{
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			if proxyInfo, ok := req.Context().Value(proxyInfoKey).(ProxyInfo); ok {
+				t := proxyInfo.Type
+				if t != "vercel" && t != "cloudflare" && t != "deno" && proxyInfo.ProxyURL != "" {
+					return url.Parse(proxyInfo.ProxyURL)
+				}
+			}
+			return nil, nil
+		},
 	}
 
 	return &Client{
@@ -205,16 +223,44 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 }
 
 func (c *Client) doOnce(req *http.Request) (*http.Response, error) {
-	start := time.Now()
-	bodyPreview := requestBodyPreview(req)
-	if bodyPreview != "" {
-		c.logger.DebugModule("UPSTREAM", "upstream request method=%s url=%s accept=%s content_type=%s auth=%t body=%s", req.Method, req.URL.String(), req.Header.Get("Accept"), req.Header.Get("Content-Type"), strings.TrimSpace(req.Header.Get("Authorization")) != "", bodyPreview)
-	} else {
-		c.logger.DebugModule("UPSTREAM", "upstream request method=%s url=%s accept=%s content_type=%s auth=%t", req.Method, req.URL.String(), req.Header.Get("Accept"), req.Header.Get("Content-Type"), strings.TrimSpace(req.Header.Get("Authorization")) != "")
+	clonedReq := req.Clone(req.Context())
+
+	// Apply cloud relay logic if necessary
+	if proxyInfo, ok := clonedReq.Context().Value(proxyInfoKey).(ProxyInfo); ok {
+		t := proxyInfo.Type
+		if t == "vercel" || t == "cloudflare" || t == "deno" {
+			clonedReq.Header.Set("x-relay-target", fmt.Sprintf("%s://%s", clonedReq.URL.Scheme, clonedReq.URL.Host))
+			path := clonedReq.URL.Path
+			if clonedReq.URL.RawQuery != "" {
+				path += "?" + clonedReq.URL.RawQuery
+			}
+			clonedReq.Header.Set("x-relay-path", path)
+
+			if relayURL, err := url.Parse(proxyInfo.ProxyURL); err == nil {
+				clonedReq.URL.Scheme = relayURL.Scheme
+				clonedReq.URL.Host = relayURL.Host
+				if relayURL.Path == "" {
+					clonedReq.URL.Path = "/"
+				} else {
+					clonedReq.URL.Path = relayURL.Path
+				}
+				clonedReq.URL.RawQuery = ""
+				clonedReq.Host = relayURL.Host
+			}
+		}
 	}
-	resp, err := c.httpClient.Do(req)
+
+	start := time.Now()
+	bodyPreview := requestBodyPreview(clonedReq)
+	if bodyPreview != "" {
+		c.logger.DebugModule("UPSTREAM", "upstream request method=%s url=%s accept=%s content_type=%s auth=%t body=%s", clonedReq.Method, clonedReq.URL.String(), clonedReq.Header.Get("Accept"), clonedReq.Header.Get("Content-Type"), strings.TrimSpace(clonedReq.Header.Get("Authorization")) != "", bodyPreview)
+	} else {
+		c.logger.DebugModule("UPSTREAM", "upstream request method=%s url=%s accept=%s content_type=%s auth=%t", clonedReq.Method, clonedReq.URL.String(), clonedReq.Header.Get("Accept"), clonedReq.Header.Get("Content-Type"), strings.TrimSpace(clonedReq.Header.Get("Authorization")) != "")
+	}
+	
+	resp, err := c.httpClient.Do(clonedReq)
 	if err != nil {
-		c.logger.WarnModule("UPSTREAM", "upstream request failed method=%s url=%s duration=%s err=%v", req.Method, req.URL.String(), time.Since(start), err)
+		c.logger.WarnModule("UPSTREAM", "upstream request failed method=%s url=%s duration=%s err=%v", clonedReq.Method, clonedReq.URL.String(), time.Since(start), err)
 		return nil, err
 	}
 	if err := decodeCompressedBody(resp); err != nil {

@@ -33,6 +33,7 @@ import { PromptsTab } from "./components/prompts-tab";
 import { SettingsTab } from "./components/settings-tab";
 import { UploadsTab } from "./components/uploads-tab";
 import { DataScreenTab } from "./components/datascreen-tab";
+import { ProxiesTab } from "./components/proxies-tab";
 import { formatCompactNumber } from "./components/dashboard-charts";
 import { PROMPT_IDS, promptValue } from "./prompts";
 import type { TabKey } from "./types";
@@ -70,7 +71,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
       key: "system",
       label: t("nav.system"),
       icon: <Settings size={18} />,
-      subTabs: ["accounts", "settings", "models"],
+      subTabs: ["accounts", "settings", "models", "proxies"],
       defaultTab: "accounts",
     },
     {
@@ -100,6 +101,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
     images: t("nav.images"),
     videos: t("nav.videos"),
     debug: t("nav.debug"),
+    proxies: "Proxy Pools",
   };
 
   const [renderedTabs, setRenderedTabs] = useState<Record<TabKey, boolean>>(() => {
@@ -115,6 +117,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
       images: false,
       videos: false,
       debug: false,
+      proxies: false,
       [initial]: true,
     } as Record<TabKey, boolean>;
   });
@@ -493,6 +496,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
           {renderedTabs["accounts"] && (
             <div style={{ display: state.activeTab === "accounts" ? "block" : "none" }}>
               <AccountsTab
+                apiKey={state.apiKey}
                 accounts={state.accounts}
                 batchTask={state.batchTask}
                 filters={state.filters}
@@ -534,6 +538,12 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
                 saveSettings={actions.saveSettings}
                 saveChatCleanupMode={actions.saveChatCleanupMode}
               />
+            </div>
+          )}
+
+          {renderedTabs["proxies"] && (
+            <div style={{ display: state.activeTab === "proxies" ? "block" : "none" }}>
+              <ProxiesTab apiKey={state.apiKey} />
             </div>
           )}
 

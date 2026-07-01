@@ -36,10 +36,6 @@ QWEN_CHAT_PROXY_URL=https://chat.qwen.ai
 QWEN_WEB2_CONTROL_PROMPT=
 PROMPT_OVERRIDES_JSON={}
 
-# Optional outbound proxy
-# PROXY_URL=http://127.0.0.1:7890
-PROXY_URL=
-
 # Redis URL, used only when DATA_SAVE_MODE=redis
 # REDIS_URL=redis://127.0.0.1:6379/0
 REDIS_URL=

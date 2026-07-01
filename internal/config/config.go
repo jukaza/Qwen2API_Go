@@ -31,7 +31,6 @@ type Config struct {
 	MaxLogFiles           int
 	QwenChatProxyURL      string
 	QwenWeb2ControlPrompt string
-	ProxyURL              string
 	ChatCleanupMode       int
 	PromptOverrides       map[string]string
 	TelegramBotToken      string
@@ -74,7 +73,6 @@ func Load() Config {
 		MaxLogFiles:           getEnvInt("MAX_LOG_FILES", 5),
 		QwenChatProxyURL:      getEnv("QWEN_CHAT_PROXY_URL", "https://chat.qwen.ai"),
 		QwenWeb2ControlPrompt: prompts.Resolve(promptOverrides, prompts.IDQwenWeb2Control),
-		ProxyURL:              os.Getenv("PROXY_URL"),
 		ChatCleanupMode:       getEnvInt("CHAT_CLEANUP_MODE", 0),
 		PromptOverrides:       promptOverrides,
 		TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),

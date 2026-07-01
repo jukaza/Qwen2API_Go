@@ -534,7 +534,7 @@ export function useAdminConsole(initialTab?: TabKey) {
       },
       refreshAccount: async (email: string) => {
         await submitAction("/api/refreshAccount", { email });
-        setToast({ type: "success", message: `${email} 刷新成功` });
+        setToast({ type: "success", message: `${email} đã được làm mới thành công` });
         await loadAccounts();
         await loadShell();
       },

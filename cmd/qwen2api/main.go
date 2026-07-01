@@ -17,6 +17,7 @@ import (
 	"qwen2api/internal/logging"
 	"qwen2api/internal/metrics"
 	"qwen2api/internal/openai"
+	"qwen2api/internal/proxy"
 	"qwen2api/internal/qwen"
 	"qwen2api/internal/server"
 	"qwen2api/internal/storage"
@@ -51,12 +52,19 @@ func main() {
 		logger.ErrorModule("APP", "初始化Session存储失败: %v", err)
 		os.Exit(1)
 	}
+	proxyStore, err := storage.NewProxyStore(cfg)
+	if err != nil {
+		logger.ErrorModule("APP", "初始化Proxy存储失败: %v", err)
+		os.Exit(1)
+	}
+
+	proxyMgr := proxy.NewManager(proxyStore, store, logger)
 
 	keyring := auth.NewKeyring(cfg.APIKeys, cfg.AdminKey)
 	runtime := config.NewRuntime(cfg)
 	stats := metrics.NewDashboardStats()
 	qwenClient := qwen.NewClient(cfg, logger)
-	accountService := account.NewService(cfg, runtime, store, qwenClient, logger)
+	accountService := account.NewService(cfg, runtime, store, qwenClient, proxyMgr, logger)
 	conversationSessions := openai.NewConversationSessionService(conversationStore, logger)
 	chatTracker, err := storage.NewChatTracker(cfg)
 	if err != nil {
@@ -78,8 +86,8 @@ func main() {
 	defer accountService.Close()
 	defer cleanupService.Stop()
 
-	openAIHandler := openai.NewHandler(cfg, runtime, qwenClient, accountService, conversationSessions, chatTracker, stats, logger)
-	adminHandler := admin.NewHandler(cfg, runtime, keyring, accountService, openAIHandler, stats, logger, sessionStore, tgService)
+	openAIHandler := openai.NewHandler(cfg, runtime, qwenClient, accountService, conversationSessions, proxyMgr, chatTracker, stats, logger)
+	adminHandler := admin.NewHandler(cfg, runtime, keyring, accountService, openAIHandler, stats, logger, sessionStore, tgService, proxyStore, proxyMgr)
 	httpServer := server.New(cfg, keyring, openAIHandler, adminHandler, stats, logger, sessionStore)
 	serverErrCh := make(chan error, 1)
 

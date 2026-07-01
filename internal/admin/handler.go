@@ -21,36 +21,41 @@ import (
 	"qwen2api/internal/metrics"
 	"qwen2api/internal/openai"
 	"qwen2api/internal/prompts"
+	"qwen2api/internal/proxy"
 	"qwen2api/internal/storage"
 	"qwen2api/internal/telegram"
 )
 
 type Handler struct {
-	cfg       config.Config
-	runtime   *config.Runtime
-	keyring   *auth.Keyring
-	accounts  *account.Service
-	openai    *openai.Handler
-	metrics   *metrics.DashboardStats
-	logger    *logging.Logger
-	sessions  storage.SessionStore
-	tgService *telegram.Service
+	cfg        config.Config
+	runtime    *config.Runtime
+	keyring    *auth.Keyring
+	accounts   *account.Service
+	openai     *openai.Handler
+	metrics    *metrics.DashboardStats
+	logger     *logging.Logger
+	sessions   storage.SessionStore
+	tgService  *telegram.Service
+	proxyStore storage.ProxyStore
+	proxyMgr   *proxy.Manager
 
 	batches *batchManager
 }
 
-func NewHandler(cfg config.Config, runtime *config.Runtime, keyring *auth.Keyring, accounts *account.Service, openaiHandler *openai.Handler, stats *metrics.DashboardStats, logger *logging.Logger, sessions storage.SessionStore, tgService *telegram.Service) *Handler {
+func NewHandler(cfg config.Config, runtime *config.Runtime, keyring *auth.Keyring, accounts *account.Service, openaiHandler *openai.Handler, stats *metrics.DashboardStats, logger *logging.Logger, sessions storage.SessionStore, tgService *telegram.Service, proxyStore storage.ProxyStore, proxyMgr *proxy.Manager) *Handler {
 	return &Handler{
-		cfg:       cfg,
-		runtime:   runtime,
-		keyring:   keyring,
-		accounts:  accounts,
-		openai:    openaiHandler,
-		metrics:   stats,
-		logger:    logger,
-		sessions:  sessions,
-		tgService: tgService,
-		batches:   newBatchManager(),
+		cfg:        cfg,
+		runtime:    runtime,
+		keyring:    keyring,
+		accounts:   accounts,
+		openai:     openaiHandler,
+		metrics:    stats,
+		logger:     logger,
+		sessions:   sessions,
+		tgService:  tgService,
+		proxyStore: proxyStore,
+		proxyMgr:   proxyMgr,
+		batches:    newBatchManager(),
 	}
 }
 
@@ -612,6 +617,7 @@ func (h *Handler) HandleGetAccounts(w http.ResponseWriter, r *http.Request) {
 			"expiresAt":      expiresAt,
 			"status":         runtime.Status,
 			"remainingHours": runtime.RemainingHours,
+			"proxyId":        item.ProxyID,
 		})
 	}
 
@@ -707,6 +713,22 @@ func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"message": "账号删除成功"})
 }
 
+func (h *Handler) HandleUpdateAccountProxy(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Email   string `json:"email"`
+		ProxyID string `json:"proxyId"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体格式错误"})
+		return
+	}
+	if err := h.accounts.UpdateAccountProxy(payload.Email, payload.ProxyID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"message": "Account proxy updated successfully"})
+}
+
 func (h *Handler) HandleRefreshAccount(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Email string `json:"email"`
@@ -723,7 +745,7 @@ func (h *Handler) HandleRefreshAccount(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, status, map[string]any{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"message": "账号令牌刷新成功", "email": payload.Email})
+	writeJSON(w, http.StatusOK, map[string]any{"message": "Làm mới token thành công", "email": payload.Email})
 }
 
 func (h *Handler) HandleRefreshAllAccounts(w http.ResponseWriter, r *http.Request) {
