@@ -21,7 +21,7 @@ type Analytics = OverviewResponse["analytics"];
 
 export function formatCompactNumber(value: number | undefined) {
   const safeValue = Number(value || 0);
-  return new Intl.NumberFormat("zh-CN", {
+  return new Intl.NumberFormat("vi-VN", {
     notation: safeValue >= 10000 ? "compact" : "standard",
     maximumFractionDigits: 1,
   }).format(safeValue);
@@ -29,7 +29,7 @@ export function formatCompactNumber(value: number | undefined) {
 
 export function formatDecimal(value: number | undefined, digits = 1) {
   const safeValue = Number(value || 0);
-  return new Intl.NumberFormat("zh-CN", {
+  return new Intl.NumberFormat("vi-VN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,
   }).format(safeValue);

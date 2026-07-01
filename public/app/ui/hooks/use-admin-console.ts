@@ -101,7 +101,7 @@ export function useAdminConsole(initialTab?: TabKey) {
     return [...filtered].sort((left, right) => {
       const usageDiff = (right.usage?.totalTokens || 0) - (left.usage?.totalTokens || 0);
       if (usageDiff !== 0) return usageDiff;
-      return left.id.localeCompare(right.id, "zh-CN");
+      return left.id.localeCompare(right.id, "vi-VN");
     });
   }, [deferredModelKeyword, models]);
 

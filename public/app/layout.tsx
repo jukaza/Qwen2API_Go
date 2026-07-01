@@ -38,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="zh-CN"
+      lang="vi"
       className={`${inter.variable} ${jetbrainsMono.variable} ${notoSansSC.variable} ${notoSansJP.variable} antialiased`}
     >
       <body className="min-h-full">
