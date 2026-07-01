@@ -171,4 +171,3 @@ func (k *Keyring) DeleteRegularKey(key string) error {
 	}
 	return ErrAPIKeyNotFound
 }
-

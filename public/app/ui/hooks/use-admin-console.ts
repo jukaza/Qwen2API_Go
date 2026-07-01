@@ -132,7 +132,7 @@ export function useAdminConsole(initialTab?: TabKey) {
         setPrompts(normalizePromptsResponse(promptsRes));
         setModels(modelsRes.data || []);
       } catch (error) {
-        setToast({ type: "error", message: error instanceof Error ? error.message : "加载控制台失败" });
+        setToast({ type: "error", message: error instanceof Error ? error.message : "Tải bảng điều khiển thất bại" });
       }
     },
     [apiKey],
@@ -154,7 +154,7 @@ export function useAdminConsole(initialTab?: TabKey) {
         const response = await apiRequest<AccountsResponse>(`/api/getAllAccounts?${query.toString()}`, {}, requestKey);
         setAccounts(response);
       } catch (error) {
-        setToast({ type: "error", message: error instanceof Error ? error.message : "加载账号列表失败" });
+        setToast({ type: "error", message: error instanceof Error ? error.message : "Tải danh sách tài khoản thất bại" });
       }
     },
     [apiKey, filters.page, filters.pageSize, filters.keyword, filters.sortBy, filters.sortOrder, filters.status],
@@ -172,7 +172,7 @@ export function useAdminConsole(initialTab?: TabKey) {
           await loadShell();
         }
       } catch (error) {
-        setToast({ type: "error", message: error instanceof Error ? error.message : "批量任务查询失败" });
+        setToast({ type: "error", message: error instanceof Error ? error.message : "Truy vấn nhiệm vụ hàng loạt thất bại" });
       }
     },
     [apiKey, loadAccounts, loadShell],
@@ -186,13 +186,13 @@ export function useAdminConsole(initialTab?: TabKey) {
           body: JSON.stringify({ apiKey: key }),
         });
         if (!result.isAdmin) {
-          throw new Error("当前 API Key 不是管理员密钥");
+          throw new Error("API Key hiện tại không phải là khóa quản trị");
         }
         window.localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
         setVerified(true);
         if (!silent) {
-          setToast({ type: "success", message: "管理员验证成功，已载入控制台。" });
+          setToast({ type: "success", message: "Xác thực quản trị viên thành công, đã tải bảng điều khiển." });
         }
         startShellTransition(() => {
           void loadShell(key);
@@ -201,7 +201,7 @@ export function useAdminConsole(initialTab?: TabKey) {
         setVerified(false);
         setApiKey("");
         window.localStorage.removeItem(STORAGE_KEY);
-        setToast({ type: "error", message: error instanceof Error ? error.message : "验证失败" });
+        setToast({ type: "error", message: error instanceof Error ? error.message : "Xác thực thất bại" });
       }
     },
     [loadShell],
@@ -413,7 +413,7 @@ export function useAdminConsole(initialTab?: TabKey) {
       setToast({ type: "success", message: successMessage });
       await loadShell();
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "保存失败" });
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Lưu thất bại" });
     } finally {
       setSavingSettings(false);
     }
@@ -498,14 +498,14 @@ export function useAdminConsole(initialTab?: TabKey) {
       setThresholdHours,
       setSettings,
       savePrompts: async (updates: Record<string, string>) => {
-        await saveSettings("/api/prompts", { prompts: updates }, "提示词配置已更新。");
+        await saveSettings("/api/prompts", { prompts: updates }, "Cấu hình gợi ý đã được cập nhật.");
       },
       resetPrompts: async (ids: string[]) => {
-        await saveSettings("/api/prompts/reset", { ids }, ids.length ? "提示词已恢复默认。" : "全部提示词已恢复默认。");
+        await saveSettings("/api/prompts/reset", { ids }, ids.length ? "Gợi ý đã được khôi phục về mặc định." : "Tất cả gợi ý đã được khôi phục về mặc định.");
       },
       setActiveTab,
       saveChatCleanupMode: async (mode: number) => {
-        await saveSettings("/api/setChatCleanupMode", { chatCleanupMode: mode }, "对话清理模式已更新。");
+        await saveSettings("/api/setChatCleanupMode", { chatCleanupMode: mode }, "Chế độ dọn dẹp trò chuyện đã được cập nhật.");
       },
       toggleSidebar: () => setSidebarCollapsed((current) => !current),
       toggleTheme: () => setThemeMode((current) => (current === "light" ? "dark" : "light")),
@@ -514,7 +514,7 @@ export function useAdminConsole(initialTab?: TabKey) {
         await submitAction("/api/setAccount", { email: newAccountEmail, password: newAccountPassword });
         setNewAccountEmail("");
         setNewAccountPassword("");
-        setToast({ type: "success", message: "账号创建成功。" });
+        setToast({ type: "success", message: "Tài khoản đã được tạo thành công." });
         await loadAccounts();
         await loadShell();
       },
@@ -523,12 +523,12 @@ export function useAdminConsole(initialTab?: TabKey) {
         if (response) {
           setBatchTask(response);
           setBatchAccountsText("");
-          setToast({ type: "info", message: "批量任务已创建，后台正在处理。" });
+          setToast({ type: "info", message: "Nhiệm vụ hàng loạt đã được tạo, nền đang xử lý." });
         }
       },
       deleteAccount: async (email: string) => {
         await submitAction("/api/deleteAccount", { email }, "DELETE");
-        setToast({ type: "success", message: `已删除 ${email}` });
+        setToast({ type: "success", message: `Đã xóa ${email}` });
         await loadAccounts();
         await loadShell();
       },
@@ -542,13 +542,13 @@ export function useAdminConsole(initialTab?: TabKey) {
         const path = force ? "/api/forceRefreshAllAccounts" : "/api/refreshAllAccounts";
         const body = force ? {} : { thresholdHours: Number(thresholdHours) || 24 };
         await submitAction(path, body);
-        setToast({ type: "success", message: force ? "已触发全量强刷。" : "已触发阈值刷新。" });
+        setToast({ type: "success", message: force ? "Đã kích hoạt làm mới toàn bộ." : "Đã kích hoạt làm mới theo ngưỡng." });
         await loadAccounts();
         await loadShell();
       },
       reloadRuntimeConfig: async () => {
         await submitAction("/api/reload-runtime-config", {});
-        setToast({ type: "success", message: "已重新加载 .env，运行配置已热更新。" });
+        setToast({ type: "success", message: "Đã tải lại .env, cấu hình chạy đã được cập nhật nóng." });
         await loadShell();
       },
       refreshModels: async () => {
@@ -556,26 +556,26 @@ export function useAdminConsole(initialTab?: TabKey) {
           setRefreshingModels(true);
           const response = await submitAction<ModelsResponse>("/api/refresh-models", {});
           if (response) setModels(response.data || []);
-          setToast({ type: "success", message: "模型列表已从上游刷新。" });
+          setToast({ type: "success", message: "Danh sách mô hình đã được làm mới từ thượng nguồn." });
         } catch (error) {
-          setToast({ type: "error", message: error instanceof Error ? error.message : "刷新模型列表失败" });
+          setToast({ type: "error", message: error instanceof Error ? error.message : "Làm mới danh sách mô hình thất bại" });
         } finally {
           setRefreshingModels(false);
         }
       },
       addRegularKey: async (key: string, label: string, isAdmin: boolean) => {
         await submitAction("/api/addRegularKey", { apiKey: key, label, isAdmin });
-        setToast({ type: "success", message: "API Key 已添加。" });
+        setToast({ type: "success", message: "API Key đã được thêm." });
         await loadShell();
       },
       deleteRegularKey: async (key: string) => {
         await submitAction("/api/deleteRegularKey", { apiKey: key });
-        setToast({ type: "success", message: "API Key 已删除。" });
+        setToast({ type: "success", message: "API Key đã được xóa." });
         await loadShell();
       },
       updateAPIKey: async (key: string, label: string, isAdmin: boolean) => {
         await submitAction("/api/updateAPIKey", { apiKey: key, label, isAdmin });
-        setToast({ type: "success", message: "API Key 已更新。" });
+        setToast({ type: "success", message: "API Key đã được cập nhật." });
         await loadShell();
       },
       saveSettings,

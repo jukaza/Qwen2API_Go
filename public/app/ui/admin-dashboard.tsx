@@ -293,7 +293,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
           <button
             className="admin-btn admin-btn-ghost admin-btn-sm ml-auto hidden lg:flex"
             onClick={actions.toggleSidebar}
-            title={state.sidebarCollapsed ? "展开" : "收起"}
+            title={state.sidebarCollapsed ? "Mở rộng" : "Thu gọn"}
           >
             {state.sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>

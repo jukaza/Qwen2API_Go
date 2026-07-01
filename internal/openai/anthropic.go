@@ -121,7 +121,7 @@ func (h *Handler) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request
 
 	var payload anthropicRequest
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "请求体格式错误")
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "Request body format error")
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *Handler) HandleAnthropicCountTokens(w http.ResponseWriter, r *http.Requ
 
 	var payload anthropicRequest
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "请求体格式错误")
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "Request body format error")
 		return
 	}
 
@@ -181,7 +181,7 @@ func validateAnthropicVersion(r *http.Request) error {
 	if anthropicVersionPattern.MatchString(version) {
 		return nil
 	}
-	return fmt.Errorf("anthropic-version 格式不支持")
+	return fmt.Errorf("anthropic-version format not supported")
 }
 
 func convertAnthropicRequest(payload anthropicRequest) (executedChatRequest, error) {
@@ -239,7 +239,7 @@ func normalizeAnthropicSystem(raw json.RawMessage) (string, error) {
 
 	blocks, err := normalizeAnthropicContent(raw)
 	if err != nil {
-		return "", fmt.Errorf("system 字段格式不支持")
+		return "", fmt.Errorf("system field format not supported")
 	}
 
 	parts := make([]string, 0, len(blocks))
@@ -254,7 +254,7 @@ func normalizeAnthropicSystem(raw json.RawMessage) (string, error) {
 func normalizeAnthropicMessage(message anthropicMessage) ([]map[string]any, error) {
 	role := strings.TrimSpace(message.Role)
 	if role == "" {
-		return nil, fmt.Errorf("messages.role 是必填参数")
+		return nil, fmt.Errorf("messages.role is a required parameter")
 	}
 
 	content, err := normalizeAnthropicContent(message.Content)
@@ -307,7 +307,7 @@ func normalizeAnthropicContent(raw json.RawMessage) ([]anthropicContentBlock, er
 
 	var blocks []anthropicContentBlock
 	if err := json.Unmarshal(raw, &blocks); err != nil {
-		return nil, fmt.Errorf("messages.content 格式不支持")
+		return nil, fmt.Errorf("messages.content format not supported")
 	}
 	return blocks, nil
 }
@@ -511,7 +511,7 @@ func anthropicResponseFormatInstructionWithOverrides(raw json.RawMessage, prompt
 func (h *Handler) handleAnthropicNonStream(w http.ResponseWriter, body io.Reader, model string, statsModel string, toolNames []string, estimatedPromptTokens int) {
 	result, upstreamErr, err := h.readCompletedChat(body, model, toolNames)
 	if err != nil {
-		writeAnthropicStatusError(w, http.StatusBadGateway, "读取上游响应失败")
+		writeAnthropicStatusError(w, http.StatusBadGateway, "Failed to read upstream response")
 		return
 	}
 	if upstreamErr != nil {

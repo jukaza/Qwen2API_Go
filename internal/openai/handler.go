@@ -730,7 +730,7 @@ func (h *Handler) uploadInlineMedia(ctx context.Context, token string, messages 
 func (h *Handler) uploadDataURI(ctx context.Context, token string, raw string, field string) (string, error) {
 	matches := dataURIExpr.FindStringSubmatch(strings.TrimSpace(raw))
 	if len(matches) != 3 {
-		return "", errors.New("无效的 data URI")
+		return "", errors.New("invalid data URI")
 	}
 
 	contentType := strings.TrimSpace(matches[1])
@@ -911,7 +911,7 @@ func buildModelVariant(model qwen.Model, suffix string) map[string]any {
 func (h *Handler) HandleChatCompletion(w http.ResponseWriter, r *http.Request) {
 	var payload chatRequest
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体格式错误"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
 	estimatedPromptTokens := estimateOpenAIInputTokens(payload.Messages, payload.Tools, payload.ToolChoice)
@@ -1241,7 +1241,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, body io.Reader, model stri
 func (h *Handler) handleNonStream(w http.ResponseWriter, body io.Reader, model string, statsModel string, toolNames []string, toolSchemas []toolcall.ToolSchema, estimatedPromptTokens int) {
 	result, upstreamErr, err := h.readCompletedChat(body, model, toolNames)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "读取上游响应失败"})
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "failed to read upstream response"})
 		return
 	}
 	if upstreamErr != nil {
@@ -1590,11 +1590,11 @@ func (h *Handler) HandleImagesGeneration(w http.ResponseWriter, r *http.Request)
 		ResponseFormat string `json:"response_format"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "请求体格式错误"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "invalid request body"}})
 		return
 	}
 	if strings.TrimSpace(payload.Prompt) == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "prompt 是必填参数"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "prompt is required"}})
 		return
 	}
 
@@ -1621,7 +1621,7 @@ func (h *Handler) HandleImagesGeneration(w http.ResponseWriter, r *http.Request)
 
 func (h *Handler) HandleImagesEdit(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(100 << 20); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "无法解析 multipart 请求"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "failed to parse multipart request"}})
 		return
 	}
 	prompt := r.FormValue("prompt")
@@ -1635,7 +1635,7 @@ func (h *Handler) HandleImagesEdit(w http.ResponseWriter, r *http.Request) {
 	parts := []map[string]any{{"type": "text", "text": prompt}}
 	files := collectMultipartFiles(r.MultipartForm)
 	if len(files) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "image 是必填参数"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "image is required"}})
 		return
 	}
 	for _, file := range files {
@@ -1718,11 +1718,11 @@ func (h *Handler) HandleVideos(w http.ResponseWriter, r *http.Request) {
 		Size   string `json:"size"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "请求体格式错误"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "invalid request body"}})
 		return
 	}
 	if strings.TrimSpace(payload.Prompt) == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "prompt 是必填参数"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"message": "prompt is required"}})
 		return
 	}
 
@@ -1832,7 +1832,7 @@ func (h *Handler) generateAssetWithSession(ctx context.Context, requestedModel, 
 	if chatType == "t2v" && len(result.TaskCandidates) > 0 {
 		return h.pollVideo(ctx, session.Token, result.TaskCandidates)
 	}
-	return "", &assetParseError{message: "未能从上游响应中解析资源链接", result: result}
+	return "", &assetParseError{message: "failed to parse resource link from upstream response", result: result}
 }
 
 func (h *Handler) pollVideo(ctx context.Context, token string, taskCandidates []string) (string, error) {
@@ -1855,7 +1855,7 @@ func (h *Handler) pollVideo(ctx context.Context, token string, taskCandidates []
 			}
 		}
 	}
-	return "", errors.New("视频生成超时，请稍后再试")
+	return "", errors.New("video generation timed out, please try again later")
 }
 
 func (h *Handler) resolveAssetFromChatDetail(ctx context.Context, token, chatID string, responseIDs []string) string {

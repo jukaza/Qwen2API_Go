@@ -209,7 +209,7 @@ func (s *fileProxyStore) ensure() error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	if _, err := os.Stat(s.path); err == nil {
+	if info, err := os.Stat(s.path); err == nil && info.Size() > 0 {
 		return nil
 	}
 	defaultData := FileData{

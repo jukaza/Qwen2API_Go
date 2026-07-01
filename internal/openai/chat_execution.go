@@ -115,7 +115,7 @@ func (h *Handler) executeChatRequest(ctx context.Context, payload executedChatRe
 	}
 
 	if lastErr == nil {
-		lastErr = fmt.Errorf("上游聊天请求失败")
+		lastErr = fmt.Errorf("upstream chat request failed")
 	}
 	return nil, lastStatus, lastErr
 }
@@ -362,6 +362,6 @@ func (h *Handler) recordChatUsage(accountEmail, chatID string) {
 		return
 	}
 	if err := h.chat.RecordChatUsage(accountEmail, chatID); err != nil && h.logger != nil {
-		h.logger.WarnModule("OPENAI", "记录对话使用失败 account=%s chat_id=%s err=%v", accountEmail, chatID, err)
+		h.logger.WarnModule("OPENAI", "failed to record chat usage account=%s chat_id=%s err=%v", accountEmail, chatID, err)
 	}
 }

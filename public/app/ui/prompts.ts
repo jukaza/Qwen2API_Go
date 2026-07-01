@@ -32,8 +32,8 @@ export function normalizePromptsResponse(value: unknown): PromptsResponse | null
     .filter((item): item is Partial<PromptItem> => Boolean(item) && typeof item === "object")
     .map((item) => ({
       id: typeof item.id === "string" ? item.id : "",
-      category: typeof item.category === "string" ? item.category : "未分类",
-      title: typeof item.title === "string" ? item.title : "未命名提示词",
+      category: typeof item.category === "string" ? item.category : "Chưa phân loại",
+      title: typeof item.title === "string" ? item.title : "Prompt chưa đặt tên",
       description: typeof item.description === "string" ? item.description : "",
       defaultValue: typeof item.defaultValue === "string" ? item.defaultValue : "",
       value: typeof item.value === "string" ? item.value : "",

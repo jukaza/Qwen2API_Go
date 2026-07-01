@@ -141,7 +141,7 @@ var definitions = []Definition{
 		Category:     "Tạo tài nguyên",
 		Title:        "Prompt mặc định chỉnh sửa hình ảnh",
 		Description:  "Sử dụng khi giao diện chỉnh sửa hình ảnh không cung cấp prompt.",
-		DefaultValue: "请基于上传图片完成编辑",
+		DefaultValue: "Vui lòng hoàn thành chỉnh sửa dựa trên hình ảnh đã tải lên",
 	},
 	{
 		ID:           IDAdminDebugSystem,

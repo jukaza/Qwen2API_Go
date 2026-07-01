@@ -33,34 +33,34 @@ func main() {
 	logger := logging.New(cfg.DebugMode)
 
 	if len(cfg.APIKeys) == 0 {
-		logger.ErrorModule("APP", "请务必设置 API_KEY 环境变量")
+		logger.ErrorModule("APP", "Vui lòng thiết lập biến môi trường API_KEY")
 		os.Exit(1)
 	}
 
 	store, err := storage.NewAccountStore(cfg)
 	if err != nil {
-		logger.ErrorModule("APP", "初始化账号存储失败: %v", err)
+		logger.ErrorModule("APP", "Khởi tạo lưu trữ tài khoản thất bại: %v", err)
 		os.Exit(1)
 	}
 	conversationStore, err := storage.NewConversationStore(cfg)
 	if err != nil {
-		logger.ErrorModule("APP", "初始化会话存储失败: %v", err)
+		logger.ErrorModule("APP", "Khởi tạo lưu trữ hội thoại thất bại: %v", err)
 		os.Exit(1)
 	}
 	sessionStore, err := storage.NewSessionStore(cfg)
 	if err != nil {
-		logger.ErrorModule("APP", "初始化Session存储失败: %v", err)
+		logger.ErrorModule("APP", "Khởi tạo lưu trữ session thất bại: %v", err)
 		os.Exit(1)
 	}
 	proxyStore, err := storage.NewProxyStore(cfg)
 	if err != nil {
-		logger.ErrorModule("APP", "初始化Proxy存储失败: %v", err)
+		logger.ErrorModule("APP", "Khởi tạo lưu trữ proxy thất bại: %v", err)
 		os.Exit(1)
 	}
 
 	apiKeyStore, err := storage.NewAPIKeyStore(cfg)
 	if err != nil {
-		logger.ErrorModule("APP", "初始化API Key存储失败: %v", err)
+		logger.ErrorModule("APP", "Khởi tạo lưu trữ API Key thất bại: %v", err)
 		os.Exit(1)
 	}
 
@@ -89,9 +89,9 @@ func main() {
 			})
 		}
 		if err := apiKeyStore.SaveAllAPIKeys(keysToSave); err != nil {
-			logger.WarnModule("APP", "初始化默认 API Key 失败: %v", err)
+			logger.WarnModule("APP", "Khởi tạo API Key mặc định thất bại: %v", err)
 		} else {
-			logger.InfoModule("APP", "已将默认 API Keys 导入存储中")
+			logger.InfoModule("APP", "Đã nhập API Keys mặc định vào bộ nhớ lưu trữ")
 			loadedKeys = keysToSave
 		}
 	}
@@ -104,7 +104,7 @@ func main() {
 	conversationSessions := openai.NewConversationSessionService(conversationStore, logger)
 	chatTracker, err := storage.NewChatTracker(cfg)
 	if err != nil {
-		logger.WarnModule("APP", "初始化对话追踪器失败: %v", err)
+		logger.WarnModule("APP", "Khởi tạo trình theo dõi hội thoại thất bại: %v", err)
 		chatTracker = nil
 	}
 
@@ -128,17 +128,17 @@ func main() {
 	serverErrCh := make(chan error, 1)
 
 	go func() {
-		logger.InfoModule("APP", "服务器启动中，监听 %s:%d", cfg.ListenAddressOrDefault(), cfg.ListenPort)
+		logger.InfoModule("APP", "Máy chủ đang khởi động, lắng nghe tại %s:%d", cfg.ListenAddressOrDefault(), cfg.ListenPort)
 		serverErrCh <- httpServer.ListenAndServe()
 	}()
 
 	go func() {
-		logger.InfoModule("ACCOUNT", "账号池后台初始化开始")
+		logger.InfoModule("ACCOUNT", "Bắt đầu khởi tạo ngầm bể tài khoản")
 		if initErr := accountService.Initialize(context.Background()); initErr != nil {
-			logger.ErrorModule("ACCOUNT", "账号池后台初始化失败: %v", initErr)
+			logger.ErrorModule("ACCOUNT", "Khởi tạo ngầm bể tài khoản thất bại: %v", initErr)
 			return
 		}
-		logger.InfoModule("ACCOUNT", "账号池后台初始化完成")
+		logger.InfoModule("ACCOUNT", "Khởi tạo ngầm bể tài khoản hoàn tất")
 	}()
 
 	select {
@@ -148,7 +148,7 @@ func main() {
 		_ = httpServer.Shutdown(shutdownCtx)
 	case err = <-serverErrCh:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.ErrorModule("APP", "服务器启动失败: %v", err)
+			logger.ErrorModule("APP", "Máy chủ khởi động thất bại: %v", err)
 			os.Exit(1)
 		}
 	}

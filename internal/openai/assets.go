@@ -459,9 +459,9 @@ func resolveAssetURL(result assetResult, fallbackChatID string) (string, error) 
 		return result.ContentURL, nil
 	}
 	if fallbackChatID == "" {
-		return "", &assetParseError{message: "未能从上游响应中解析资源链接", result: result}
+		return "", &assetParseError{message: "failed to parse resource link from upstream response", result: result}
 	}
-	return "", &assetParseError{message: "未能从上游响应或聊天详情中解析资源链接", result: result}
+	return "", &assetParseError{message: "failed to parse resource link from upstream response or chat details", result: result}
 }
 
 func extractAssetFromChatDetail(chatDetail map[string]any, responseIDs []string) string {

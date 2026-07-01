@@ -76,7 +76,7 @@ export async function apiRequestEnvelope<T>(
     const message =
       typeof data === "object" && data !== null
         ? extractErrorMessage(data, response.status)
-        : `请求失败 (${response.status})`;
+        : `Yêu cầu thất bại (${response.status})`;
     throw new ApiRequestError(message, envelope as ApiResponseEnvelope<unknown>);
   }
 
@@ -97,7 +97,7 @@ function parseResponseText(text: string) {
 
 function extractErrorMessage(data: unknown, status: number) {
   if (typeof data !== "object" || data === null) {
-    return `请求失败 (${status})`;
+    return `Yêu cầu thất bại (${status})`;
   }
 
   const payload = data as { error?: unknown; message?: unknown };
@@ -116,5 +116,5 @@ function extractErrorMessage(data: unknown, status: number) {
       return nested.error;
     }
   }
-  return `请求失败 (${status})`;
+  return `Yêu cầu thất bại (${status})`;
 }

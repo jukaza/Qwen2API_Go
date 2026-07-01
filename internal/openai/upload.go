@@ -30,7 +30,7 @@ func (h *Handler) HandleUploads(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(items) == 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error": map[string]any{"message": "至少上传一个文件"},
+			"error": map[string]any{"message": "At least one file must be uploaded"},
 		})
 		return
 	}
@@ -80,7 +80,7 @@ func parseUploadItems(r *http.Request) ([]uploadItem, error) {
 	switch {
 	case strings.HasPrefix(contentType, "multipart/form-data"):
 		if err := r.ParseMultipartForm(256 << 20); err != nil {
-			return nil, errors.New("无法解析 multipart 请求")
+			return nil, errors.New("failed to parse multipart request")
 		}
 		return collectUploadMultipartItems(r.MultipartForm)
 	case strings.HasPrefix(contentType, "application/json"):
@@ -98,7 +98,7 @@ func parseJSONUploadItems(r *http.Request) ([]uploadItem, error) {
 		Base64      string `json:"base64"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		return nil, errors.New("JSON 请求体格式错误")
+		return nil, errors.New("JSON request body format error")
 	}
 
 	rawData := strings.TrimSpace(payload.Data)
@@ -106,7 +106,7 @@ func parseJSONUploadItems(r *http.Request) ([]uploadItem, error) {
 		rawData = strings.TrimSpace(payload.Base64)
 	}
 	if rawData == "" {
-		return nil, errors.New("JSON 上传缺少 data/base64 字段")
+		return nil, errors.New("JSON upload is missing data/base64 field")
 	}
 
 	contentType := strings.TrimSpace(payload.ContentType)
@@ -114,7 +114,7 @@ func parseJSONUploadItems(r *http.Request) ([]uploadItem, error) {
 		contentType = fallbackUploadContentType(contentType, matches[1], payload.Filename)
 		decoded, err := base64.StdEncoding.DecodeString(matches[2])
 		if err != nil {
-			return nil, errors.New("data URI base64 解码失败")
+			return nil, errors.New("failed to decode base64 from data URI")
 		}
 		return []uploadItem{{
 			Filename:    payload.Filename,
@@ -125,7 +125,7 @@ func parseJSONUploadItems(r *http.Request) ([]uploadItem, error) {
 
 	decoded, err := base64.StdEncoding.DecodeString(rawData)
 	if err != nil {
-		return nil, errors.New("base64 解码失败")
+		return nil, errors.New("failed to decode base64")
 	}
 	return []uploadItem{{
 		Filename:    payload.Filename,
@@ -137,7 +137,7 @@ func parseJSONUploadItems(r *http.Request) ([]uploadItem, error) {
 func parseRawUploadItem(r *http.Request) ([]uploadItem, error) {
 	content, err := io.ReadAll(r.Body)
 	if err != nil {
-		return nil, errors.New("读取上传内容失败")
+		return nil, errors.New("failed to read upload content")
 	}
 	if len(content) == 0 {
 		return nil, nil
