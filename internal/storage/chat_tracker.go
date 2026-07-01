@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -39,6 +40,13 @@ func NewChatTracker(cfg config.Config) (ChatTracker, error) {
 			return nil, err
 		}
 		return &redisChatTracker{client: client}, nil
+	}
+	if isSQLiteMode(cfg) {
+		db, err := newSQLiteDB(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return &sqliteChatTracker{db: db}, nil
 	}
 	return &memoryChatTracker{usages: map[string]int64{}}, nil
 }
@@ -146,4 +154,47 @@ func chatTrackerKey(accountEmail, chatID string) string {
 
 func redisChatTrackerKey(accountEmail, chatID string) string {
 	return "qwen2api:chat_usage:" + accountEmail + ":" + chatID
+}
+
+type sqliteChatTracker struct {
+	db *sql.DB
+}
+
+func (t *sqliteChatTracker) RecordChatUsage(accountEmail, chatID string) error {
+	_, err := t.db.Exec(`
+		INSERT INTO chat_usages (account_email, chat_id, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(account_email, chat_id) DO UPDATE SET
+			updated_at=excluded.updated_at
+	`, accountEmail, chatID, time.Now().Unix())
+	return err
+}
+
+func (t *sqliteChatTracker) ListChatUsages() ([]ChatUsage, error) {
+	rows, err := t.db.Query(`SELECT account_email, chat_id, updated_at FROM chat_usages`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []ChatUsage
+	for rows.Next() {
+		var usage ChatUsage
+		if err := rows.Scan(&usage.AccountEmail, &usage.ChatID, &usage.UpdatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, usage)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if result == nil {
+		result = []ChatUsage{}
+	}
+	return result, nil
+}
+
+func (t *sqliteChatTracker) DeleteChatUsage(accountEmail, chatID string) error {
+	_, err := t.db.Exec(`DELETE FROM chat_usages WHERE account_email = ? AND chat_id = ?`, accountEmail, chatID)
+	return err
 }

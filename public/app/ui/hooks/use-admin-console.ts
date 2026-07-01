@@ -563,15 +563,19 @@ export function useAdminConsole(initialTab?: TabKey) {
           setRefreshingModels(false);
         }
       },
-      addRegularKey: async () => {
-        await submitAction("/api/addRegularKey", { apiKey: addKeyValue });
-        setAddKeyValue("");
-        setToast({ type: "success", message: "普通 API Key 已添加。" });
+      addRegularKey: async (key: string, label: string, isAdmin: boolean) => {
+        await submitAction("/api/addRegularKey", { apiKey: key, label, isAdmin });
+        setToast({ type: "success", message: "API Key 已添加。" });
         await loadShell();
       },
       deleteRegularKey: async (key: string) => {
         await submitAction("/api/deleteRegularKey", { apiKey: key });
-        setToast({ type: "success", message: "普通 API Key 已删除。" });
+        setToast({ type: "success", message: "API Key 已删除。" });
+        await loadShell();
+      },
+      updateAPIKey: async (key: string, label: string, isAdmin: boolean) => {
+        await submitAction("/api/updateAPIKey", { apiKey: key, label, isAdmin });
+        setToast({ type: "success", message: "API Key 已更新。" });
         await loadShell();
       },
       saveSettings,

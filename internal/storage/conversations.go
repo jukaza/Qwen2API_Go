@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -48,6 +49,12 @@ func NewConversationStore(cfg config.Config) (ConversationStore, error) {
 			return nil, err
 		}
 		return &redisStore{client: client}, nil
+	case "sqlite":
+		db, err := newSQLiteDB(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return &sqliteConversationStore{db: db}, nil
 	default:
 		return nil, errors.New("不支持的数据保存模式: " + cfg.DataSaveMode)
 	}
@@ -216,6 +223,98 @@ func (s *redisStore) ListConversationSessions() ([]ConversationSession, error) {
 		if cursor == 0 {
 			break
 		}
+	}
+	return result, nil
+}
+
+type sqliteConversationStore struct {
+	db *sql.DB
+}
+
+func (s *sqliteConversationStore) GetConversationSession(contextHash string) (ConversationSession, bool, error) {
+	row := s.db.QueryRow(`
+		SELECT account_email, chat_id, model, chat_type, updated_at
+		FROM chat_sessions WHERE context_hash = ?
+	`, strings.TrimSpace(contextHash))
+	var session ConversationSession
+	session.ContextHash = strings.TrimSpace(contextHash)
+	var accountEmail, chatID, model, chatType sql.NullString
+	if err := row.Scan(&accountEmail, &chatID, &model, &chatType, &session.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ConversationSession{}, false, nil
+		}
+		return ConversationSession{}, false, err
+	}
+	if accountEmail.Valid {
+		session.AccountEmail = accountEmail.String
+	}
+	if chatID.Valid {
+		session.ChatID = chatID.String
+	}
+	if model.Valid {
+		session.Model = model.String
+	}
+	if chatType.Valid {
+		session.ChatType = chatType.String
+	}
+	return session, true, nil
+}
+
+func (s *sqliteConversationStore) SaveConversationSession(session ConversationSession) error {
+	if strings.TrimSpace(session.ContextHash) == "" {
+		return nil
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO chat_sessions (context_hash, account_email, chat_id, model, chat_type, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(context_hash) DO UPDATE SET
+			account_email=excluded.account_email,
+			chat_id=excluded.chat_id,
+			model=excluded.model,
+			chat_type=excluded.chat_type,
+			updated_at=excluded.updated_at
+	`, strings.TrimSpace(session.ContextHash), session.AccountEmail, session.ChatID, session.Model, session.ChatType, session.UpdatedAt)
+	return err
+}
+
+func (s *sqliteConversationStore) DeleteConversationSession(contextHash string) error {
+	_, err := s.db.Exec(`DELETE FROM chat_sessions WHERE context_hash = ?`, strings.TrimSpace(contextHash))
+	return err
+}
+
+func (s *sqliteConversationStore) ListConversationSessions() ([]ConversationSession, error) {
+	rows, err := s.db.Query(`SELECT context_hash, account_email, chat_id, model, chat_type, updated_at FROM chat_sessions`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []ConversationSession
+	for rows.Next() {
+		var session ConversationSession
+		var accountEmail, chatID, model, chatType sql.NullString
+		if err := rows.Scan(&session.ContextHash, &accountEmail, &chatID, &model, &chatType, &session.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if accountEmail.Valid {
+			session.AccountEmail = accountEmail.String
+		}
+		if chatID.Valid {
+			session.ChatID = chatID.String
+		}
+		if model.Valid {
+			session.Model = model.String
+		}
+		if chatType.Valid {
+			session.ChatType = chatType.String
+		}
+		result = append(result, session)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if result == nil {
+		result = []ConversationSession{}
 	}
 	return result, nil
 }

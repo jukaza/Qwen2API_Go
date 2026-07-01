@@ -242,72 +242,13 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
           </div>
 
           <div className="flex flex-col gap-4">
-            {!showKeyInput ? (
-              <>
-                <button
-                  className="admin-btn admin-btn-primary w-full py-3"
-                  onClick={() => void actions.startTelegramLogin()}
-                >
-                  <Sparkles size={16} />
-                  {t("login.loginViaTelegram")}
-                </button>
-
-                <div className="relative flex items-center justify-center my-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[var(--border)]"></div>
-                  </div>
-                  <span className="relative px-3 text-xs bg-[var(--card-bg)] text-[var(--text-muted)]">{t("login.or")}</span>
-                </div>
-
-                <button
-                  className="text-xs font-medium text-[var(--primary)] hover:underline text-center"
-                  onClick={() => setShowKeyInput(true)}
-                >
-                  {t("login.enter")}
-                </button>
-              </>
-            ) : (
-              <>
-                <Input
-                  placeholder={t("login.placeholder")}
-                  type="password"
-                  value={state.apiKeyInput}
-                  onChange={(e) => actions.setApiKeyInput(e.target.value)}
-                  className="w-full"
-                  autoFocus
-                />
-                <div className="flex gap-3">
-                  <button className="admin-btn admin-btn-primary flex-1" onClick={() => void actions.verifyAdmin()}>
-                    {t("common.confirm")}
-                  </button>
-                  <button
-                    className="admin-btn admin-btn-secondary"
-                    onClick={() => {
-                      actions.setApiKeyInput("");
-                      if (typeof window !== "undefined") {
-                        window.localStorage.removeItem("qwen2api-admin-key");
-                      }
-                    }}
-                  >
-                    {t("login.clear")}
-                  </button>
-                </div>
-
-                <div className="relative flex items-center justify-center my-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[var(--border)]"></div>
-                  </div>
-                  <span className="relative px-3 text-xs bg-[var(--card-bg)] text-[var(--text-muted)]">{t("login.or")}</span>
-                </div>
-
-                <button
-                  className="text-xs font-medium text-[var(--primary)] hover:underline text-center"
-                  onClick={() => setShowKeyInput(false)}
-                >
-                  {t("login.loginViaTelegram")}
-                </button>
-              </>
-            )}
+            <button
+              className="admin-btn admin-btn-primary w-full py-3 flex items-center justify-center gap-2"
+              onClick={() => void actions.startTelegramLogin()}
+            >
+              <Sparkles size={16} />
+              {t("login.loginViaTelegram")}
+            </button>
           </div>
 
           {(state.loginStatus === "rejected" || state.loginStatus === "expired" || state.toast) ? (
@@ -533,6 +474,7 @@ export function AdminDashboard({ initialTab }: { initialTab?: TabKey } = {}) {
                 setSettings={actions.setSettings}
                 addRegularKey={actions.addRegularKey}
                 deleteRegularKey={actions.deleteRegularKey}
+                updateAPIKey={actions.updateAPIKey}
                 refreshAllAccounts={actions.refreshAllAccounts}
                 reloadRuntimeConfig={actions.reloadRuntimeConfig}
                 saveSettings={actions.saveSettings}

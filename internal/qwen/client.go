@@ -257,7 +257,7 @@ func (c *Client) doOnce(req *http.Request) (*http.Response, error) {
 	} else {
 		c.logger.DebugModule("UPSTREAM", "upstream request method=%s url=%s accept=%s content_type=%s auth=%t", clonedReq.Method, clonedReq.URL.String(), clonedReq.Header.Get("Accept"), clonedReq.Header.Get("Content-Type"), strings.TrimSpace(clonedReq.Header.Get("Authorization")) != "")
 	}
-	
+
 	resp, err := c.httpClient.Do(clonedReq)
 	if err != nil {
 		c.logger.WarnModule("UPSTREAM", "upstream request failed method=%s url=%s duration=%s err=%v", clonedReq.Method, clonedReq.URL.String(), time.Since(start), err)

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
+	"qwen2api/internal/storage"
 )
 
 type ValidationResult struct {
@@ -101,6 +103,38 @@ func (k *Keyring) Snapshot() KeyringSnapshot {
 	}
 }
 
+func (k *Keyring) SyncFromStore(keys []storage.APIKey) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+
+	var adminKey string
+	var apiKeys []string
+
+	for _, key := range keys {
+		clean := normalizeKey(key.Key)
+		if clean == "" {
+			continue
+		}
+		apiKeys = append(apiKeys, clean)
+		if key.IsAdmin {
+			adminKey = clean
+		}
+	}
+
+	if len(apiKeys) > 0 {
+		if adminKey == "" {
+			adminKey = apiKeys[0]
+		}
+	} else {
+		// Fallback to default admin key if nothing in store
+		adminKey = "sk-user-change-me"
+		apiKeys = []string{adminKey}
+	}
+
+	k.adminKey = adminKey
+	k.apiKeys = apiKeys
+}
+
 func (k *Keyring) AddRegularKey(key string) error {
 	clean := normalizeKey(key)
 	if clean == "" {
@@ -137,3 +171,4 @@ func (k *Keyring) DeleteRegularKey(key string) error {
 	}
 	return ErrAPIKeyNotFound
 }
+

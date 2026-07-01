@@ -35,6 +35,7 @@ type Config struct {
 	PromptOverrides       map[string]string
 	TelegramBotToken      string
 	TelegramAdminChatID   string
+	SQLiteDBPath          string
 }
 
 func Load() Config {
@@ -77,6 +78,7 @@ func Load() Config {
 		PromptOverrides:       promptOverrides,
 		TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
 		TelegramAdminChatID:   getEnv("TELEGRAM_ADMIN_CHAT_ID", ""),
+		SQLiteDBPath:          getEnv("SQLITE_DB_PATH", "data/data.db"),
 	}
 }
 

@@ -74,7 +74,7 @@ func TestInitializeFallsBackToGuestWhenNoAccounts(t *testing.T) {
 	defer server.Close()
 
 	client := qwen.NewClient(config.Config{QwenChatProxyURL: server.URL}, logging.New(false))
-	service := NewService(config.Config{DataSaveMode: "none"}, config.NewRuntime(config.Config{}), &stubAccountStore{}, client, logging.New(false))
+	service := NewService(config.Config{DataSaveMode: "none"}, config.NewRuntime(config.Config{}), &stubAccountStore{}, client, nil, logging.New(false))
 
 	if err := service.Initialize(context.Background()); err != nil {
 		t.Fatalf("Initialize() error = %v", err)
@@ -95,7 +95,7 @@ func TestGuestFallbackYieldsToRealAccountsAndReturnsAfterDelete(t *testing.T) {
 
 	store := &stubAccountStore{}
 	client := qwen.NewClient(config.Config{QwenChatProxyURL: server.URL}, logging.New(false))
-	service := NewService(config.Config{DataSaveMode: "none"}, config.NewRuntime(config.Config{}), store, client, logging.New(false))
+	service := NewService(config.Config{DataSaveMode: "none"}, config.NewRuntime(config.Config{}), store, client, nil, logging.New(false))
 
 	if err := service.Initialize(context.Background()); err != nil {
 		t.Fatalf("Initialize() error = %v", err)

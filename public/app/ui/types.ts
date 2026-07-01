@@ -79,9 +79,17 @@ export type OverviewResponse = {
   generatedAt: string;
 };
 
+export type APIKeyItem = {
+  key: string;
+  label: string;
+  isAdmin: boolean;
+  createdAt: number;
+};
+
 export type SettingsResponse = {
   adminKey: string | null;
   regularKeys: string[];
+  apiKeys?: APIKeyItem[];
   autoRefresh: boolean;
   autoRefreshInterval: number;
   batchLoginConcurrency: number;

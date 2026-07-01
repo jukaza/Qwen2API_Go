@@ -27,35 +27,37 @@ import (
 )
 
 type Handler struct {
-	cfg        config.Config
-	runtime    *config.Runtime
-	keyring    *auth.Keyring
-	accounts   *account.Service
-	openai     *openai.Handler
-	metrics    *metrics.DashboardStats
-	logger     *logging.Logger
-	sessions   storage.SessionStore
-	tgService  *telegram.Service
-	proxyStore storage.ProxyStore
-	proxyMgr   *proxy.Manager
+	cfg         config.Config
+	runtime     *config.Runtime
+	keyring     *auth.Keyring
+	accounts    *account.Service
+	openai      *openai.Handler
+	metrics     *metrics.DashboardStats
+	logger      *logging.Logger
+	sessions    storage.SessionStore
+	tgService   *telegram.Service
+	proxyStore  storage.ProxyStore
+	proxyMgr    *proxy.Manager
+	apiKeyStore storage.APIKeyStore
 
 	batches *batchManager
 }
 
-func NewHandler(cfg config.Config, runtime *config.Runtime, keyring *auth.Keyring, accounts *account.Service, openaiHandler *openai.Handler, stats *metrics.DashboardStats, logger *logging.Logger, sessions storage.SessionStore, tgService *telegram.Service, proxyStore storage.ProxyStore, proxyMgr *proxy.Manager) *Handler {
+func NewHandler(cfg config.Config, runtime *config.Runtime, keyring *auth.Keyring, accounts *account.Service, openaiHandler *openai.Handler, stats *metrics.DashboardStats, logger *logging.Logger, sessions storage.SessionStore, tgService *telegram.Service, proxyStore storage.ProxyStore, proxyMgr *proxy.Manager, apiKeyStore storage.APIKeyStore) *Handler {
 	return &Handler{
-		cfg:        cfg,
-		runtime:    runtime,
-		keyring:    keyring,
-		accounts:   accounts,
-		openai:     openaiHandler,
-		metrics:    stats,
-		logger:     logger,
-		sessions:   sessions,
-		tgService:  tgService,
-		proxyStore: proxyStore,
-		proxyMgr:   proxyMgr,
-		batches:    newBatchManager(),
+		cfg:         cfg,
+		runtime:     runtime,
+		keyring:     keyring,
+		accounts:    accounts,
+		openai:      openaiHandler,
+		metrics:     stats,
+		logger:      logger,
+		sessions:    sessions,
+		tgService:   tgService,
+		proxyStore:  proxyStore,
+		proxyMgr:    proxyMgr,
+		apiKeyStore: apiKeyStore,
+		batches:     newBatchManager(),
 	}
 }
 
@@ -100,11 +102,28 @@ func (h *Handler) HandleVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
+	storedKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err != nil {
+		h.logger.ErrorModule("ADMIN", "加载API Key失败: %v", err)
+		// Fallback
+		keys := h.keyring.Snapshot()
+		storedKeys = []storage.APIKey{}
+		for _, k := range keys.APIKeys {
+			storedKeys = append(storedKeys, storage.APIKey{
+				Key:       k,
+				Label:     "Default",
+				IsAdmin:   k == keys.AdminKey,
+				CreatedAt: time.Now().Unix(),
+			})
+		}
+	}
+
 	keys := h.keyring.Snapshot()
 	runtime := h.runtime.Snapshot()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"adminKey":              keys.AdminKey,
 		"regularKeys":           keys.RegularKeys,
+		"apiKeys":               storedKeys,
 		"autoRefresh":           runtime.AutoRefresh,
 		"autoRefreshInterval":   runtime.AutoRefreshInterval,
 		"batchLoginConcurrency": runtime.BatchLoginConcurrency,
@@ -201,20 +220,49 @@ func (h *Handler) HandleResetPrompts(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HandleAddRegularKey(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		APIKey string `json:"apiKey"`
+		APIKey  string `json:"apiKey"`
+		Label   string `json:"label"`
+		IsAdmin bool   `json:"isAdmin"`
 	}
 	if err := decodeJSON(r, &payload); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体格式错误"})
 		return
 	}
-	if err := h.keyring.AddRegularKey(payload.APIKey); err != nil {
-		status := http.StatusBadRequest
-		if err == auth.ErrAPIKeyExists {
-			status = http.StatusConflict
-		}
-		writeJSON(w, status, map[string]any{"error": err.Error()})
+	payload.APIKey = strings.TrimSpace(payload.APIKey)
+	if payload.APIKey == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "API Key không được để trống"})
 		return
 	}
+
+	newKey := storage.APIKey{
+		Key:       payload.APIKey,
+		Label:     payload.Label,
+		IsAdmin:   payload.IsAdmin,
+		CreatedAt: time.Now().Unix(),
+	}
+
+	// Validate if it already exists in store
+	existingKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err == nil {
+		for _, ek := range existingKeys {
+			if ek.Key == newKey.Key {
+				writeJSON(w, http.StatusConflict, map[string]any{"error": "API Key đã tồn tại"})
+				return
+			}
+		}
+	}
+
+	if err := h.apiKeyStore.SaveAPIKey(newKey); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("Lưu API Key thất bại: %v", err)})
+		return
+	}
+
+	// Sync back to keyring
+	updatedKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err == nil {
+		h.keyring.SyncFromStore(updatedKeys)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"message": "API Key添加成功"})
 }
 
@@ -226,18 +274,120 @@ func (h *Handler) HandleDeleteRegularKey(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体格式错误"})
 		return
 	}
-	if err := h.keyring.DeleteRegularKey(payload.APIKey); err != nil {
-		status := http.StatusBadRequest
-		switch err {
-		case auth.ErrDeleteAdminKey:
-			status = http.StatusForbidden
-		case auth.ErrAPIKeyNotFound:
-			status = http.StatusNotFound
-		}
-		writeJSON(w, status, map[string]any{"error": err.Error()})
+	payload.APIKey = strings.TrimSpace(payload.APIKey)
+	if payload.APIKey == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "API Key không được để trống"})
 		return
 	}
+
+	existingKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Không thể tải danh sách API Key"})
+		return
+	}
+
+	var found bool
+	var targetKey storage.APIKey
+	var adminCount int
+	for _, ek := range existingKeys {
+		if ek.Key == payload.APIKey {
+			found = true
+			targetKey = ek
+		}
+		if ek.IsAdmin {
+			adminCount++
+		}
+	}
+
+	if !found {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "API Key không tồn tại"})
+		return
+	}
+
+	if targetKey.IsAdmin && adminCount <= 1 {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "Không thể xóa khóa quản trị cuối cùng"})
+		return
+	}
+
+	if err := h.apiKeyStore.DeleteAPIKey(payload.APIKey); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("Xóa API Key thất bại: %v", err)})
+		return
+	}
+
+	// Sync back to keyring
+	updatedKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err == nil {
+		h.keyring.SyncFromStore(updatedKeys)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"message": "API Key删除成功"})
+}
+
+func (h *Handler) HandleUpdateAPIKey(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		APIKey  string `json:"apiKey"`
+		Label   string `json:"label"`
+		IsAdmin bool   `json:"isAdmin"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体格式错误"})
+		return
+	}
+	payload.APIKey = strings.TrimSpace(payload.APIKey)
+	if payload.APIKey == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "API Key không được để trống"})
+		return
+	}
+
+	existingKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Không thể tải danh sách API Key"})
+		return
+	}
+
+	var found bool
+	var targetKey storage.APIKey
+	var adminCount int
+	for _, ek := range existingKeys {
+		if ek.Key == payload.APIKey {
+			found = true
+			targetKey = ek
+		}
+		if ek.IsAdmin {
+			adminCount++
+		}
+	}
+
+	if !found {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "API Key không tồn tại"})
+		return
+	}
+
+	// If downgrading admin key to non-admin, ensure it's not the last admin key
+	if targetKey.IsAdmin && !payload.IsAdmin && adminCount <= 1 {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "Không thể hạ quyền khóa quản trị cuối cùng"})
+		return
+	}
+
+	newKey := storage.APIKey{
+		Key:       payload.APIKey,
+		Label:     payload.Label,
+		IsAdmin:   payload.IsAdmin,
+		CreatedAt: targetKey.CreatedAt,
+	}
+
+	if err := h.apiKeyStore.SaveAPIKey(newKey); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("Cập nhật API Key thất bại: %v", err)})
+		return
+	}
+
+	// Sync back to keyring
+	updatedKeys, err := h.apiKeyStore.LoadAPIKeys()
+	if err == nil {
+		h.keyring.SyncFromStore(updatedKeys)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"message": "API Key cập nhật thành công"})
 }
 
 func (h *Handler) HandleSetAutoRefresh(w http.ResponseWriter, r *http.Request) {

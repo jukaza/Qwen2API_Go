@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -52,6 +53,12 @@ func NewProxyStore(cfg config.Config) (ProxyStore, error) {
 			return nil, err
 		}
 		return &redisProxyStore{client: client}, nil
+	case "sqlite":
+		db, err := newSQLiteDB(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return &sqliteProxyStore{db: db}, nil
 	default:
 		return nil, errors.New("不支持的数据保存模式 (proxy): " + cfg.DataSaveMode)
 	}
@@ -309,4 +316,117 @@ func (s *redisProxyStore) scanProxyKeys(ctx context.Context) ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+
+type sqliteProxyStore struct {
+	db *sql.DB
+}
+
+func (s *sqliteProxyStore) LoadProxies() ([]ProxyPool, error) {
+	rows, err := s.db.Query(`
+		SELECT id, name, proxy_url, no_proxy, type, is_active, strict_proxy,
+		       test_status, last_error, last_tested_at, created_at, bound_connection_count
+		FROM proxies
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var proxies []ProxyPool
+	for rows.Next() {
+		var p ProxyPool
+		var noProxy, pType, testStatus, lastError sql.NullString
+		var lastTestedAt sql.NullInt64
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.ProxyURL, &noProxy, &pType, &p.IsActive, &p.StrictProxy,
+			&testStatus, &lastError, &lastTestedAt, &p.CreatedAt, &p.BoundConnectionCount,
+		); err != nil {
+			return nil, err
+		}
+		if noProxy.Valid {
+			p.NoProxy = noProxy.String
+		}
+		if pType.Valid {
+			p.Type = pType.String
+		}
+		if testStatus.Valid {
+			p.TestStatus = testStatus.String
+		}
+		if lastError.Valid {
+			p.LastError = lastError.String
+		}
+		if lastTestedAt.Valid {
+			p.LastTestedAt = lastTestedAt.Int64
+		}
+		proxies = append(proxies, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if proxies == nil {
+		proxies = []ProxyPool{}
+	}
+	return proxies, nil
+}
+
+func (s *sqliteProxyStore) SaveProxy(proxy ProxyPool) error {
+	_, err := s.db.Exec(`
+		INSERT INTO proxies (
+			id, name, proxy_url, no_proxy, type, is_active, strict_proxy,
+			test_status, last_error, last_tested_at, created_at, bound_connection_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name=excluded.name,
+			proxy_url=excluded.proxy_url,
+			no_proxy=excluded.no_proxy,
+			type=excluded.type,
+			is_active=excluded.is_active,
+			strict_proxy=excluded.strict_proxy,
+			test_status=excluded.test_status,
+			last_error=excluded.last_error,
+			last_tested_at=excluded.last_tested_at,
+			created_at=excluded.created_at,
+			bound_connection_count=excluded.bound_connection_count
+	`, proxy.ID, proxy.Name, proxy.ProxyURL, proxy.NoProxy, proxy.Type, proxy.IsActive, proxy.StrictProxy,
+		proxy.TestStatus, proxy.LastError, proxy.LastTestedAt, proxy.CreatedAt, proxy.BoundConnectionCount)
+	return err
+}
+
+func (s *sqliteProxyStore) DeleteProxy(id string) error {
+	_, err := s.db.Exec(`DELETE FROM proxies WHERE id = ?`, id)
+	return err
+}
+
+func (s *sqliteProxyStore) SaveAllProxies(proxies []ProxyPool) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM proxies`); err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO proxies (
+			id, name, proxy_url, no_proxy, type, is_active, strict_proxy,
+			test_status, last_error, last_tested_at, created_at, bound_connection_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, p := range proxies {
+		if _, err := stmt.Exec(
+			p.ID, p.Name, p.ProxyURL, p.NoProxy, p.Type, p.IsActive, p.StrictProxy,
+			p.TestStatus, p.LastError, p.LastTestedAt, p.CreatedAt, p.BoundConnectionCount,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

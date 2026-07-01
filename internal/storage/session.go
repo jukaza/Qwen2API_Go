@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -64,6 +65,12 @@ func NewSessionStore(cfg config.Config) (SessionStore, error) {
 			return nil, err
 		}
 		return &redisSessionStore{client: client}, nil
+	case "sqlite":
+		db, err := newSQLiteDB(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return &sqliteSessionStore{db: db}, nil
 	default:
 		return nil, errors.New("不支持的数据保存模式: " + cfg.DataSaveMode)
 	}
@@ -264,6 +271,91 @@ func (s *redisSessionStore) ListSessions() ([]Session, error) {
 		if cursor == 0 {
 			break
 		}
+	}
+	return result, nil
+}
+
+type sqliteSessionStore struct {
+	db *sql.DB
+}
+
+func (s *sqliteSessionStore) GetSession(token string) (Session, error) {
+	row := s.db.QueryRow(`
+		SELECT ip, user_agent, created_at, expires_at
+		FROM sessions WHERE token = ?
+	`, token)
+
+	var session Session
+	session.Token = token
+	var ip, userAgent sql.NullString
+	var createdAt, expiresAt int64
+
+	if err := row.Scan(&ip, &userAgent, &createdAt, &expiresAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Session{}, errors.New("session not found")
+		}
+		return Session{}, err
+	}
+	if ip.Valid {
+		session.IP = ip.String
+	}
+	if userAgent.Valid {
+		session.UserAgent = userAgent.String
+	}
+	session.CreatedAt = time.Unix(createdAt, 0)
+	session.ExpiresAt = time.Unix(expiresAt, 0)
+
+	return session, nil
+}
+
+func (s *sqliteSessionStore) SaveSession(session Session) error {
+	_, err := s.db.Exec(`
+		INSERT INTO sessions (token, ip, user_agent, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(token) DO UPDATE SET
+			ip=excluded.ip,
+			user_agent=excluded.user_agent,
+			created_at=excluded.created_at,
+			expires_at=excluded.expires_at
+	`, session.Token, session.IP, session.UserAgent, session.CreatedAt.Unix(), session.ExpiresAt.Unix())
+	return err
+}
+
+func (s *sqliteSessionStore) DeleteSession(token string) error {
+	_, err := s.db.Exec(`DELETE FROM sessions WHERE token = ?`, token)
+	return err
+}
+
+func (s *sqliteSessionStore) ListSessions() ([]Session, error) {
+	rows, err := s.db.Query(`SELECT token, ip, user_agent, created_at, expires_at FROM sessions`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []Session
+	for rows.Next() {
+		var session Session
+		var ip, userAgent sql.NullString
+		var createdAt, expiresAt int64
+		if err := rows.Scan(&session.Token, &ip, &userAgent, &createdAt, &expiresAt); err != nil {
+			return nil, err
+		}
+		if ip.Valid {
+			session.IP = ip.String
+		}
+		if userAgent.Valid {
+			session.UserAgent = userAgent.String
+		}
+		session.CreatedAt = time.Unix(createdAt, 0)
+		session.ExpiresAt = time.Unix(expiresAt, 0)
+		result = append(result, session)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if result == nil {
+		result = []Session{}
 	}
 	return result, nil
 }

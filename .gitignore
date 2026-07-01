@@ -11,3 +11,5 @@ data
 test
 *.har
 trash/
+qwen2api
+qwen2api.exe

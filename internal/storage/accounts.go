@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -37,6 +38,7 @@ type FileData struct {
 	Accounts             []Account             `json:"accounts"`
 	ProxyPools           []ProxyPool           `json:"proxyPools,omitempty"`
 	ConversationSessions []ConversationSession `json:"conversationSessions,omitempty"`
+	APIKeys              []APIKey              `json:"apiKeys,omitempty"`
 }
 
 type AccountStore interface {
@@ -59,6 +61,10 @@ type redisStore struct {
 	client *redis.Client
 }
 
+type sqliteAccountStore struct {
+	db *sql.DB
+}
+
 func NewAccountStore(cfg config.Config) (AccountStore, error) {
 	switch strings.ToLower(strings.TrimSpace(cfg.DataSaveMode)) {
 	case "", "none":
@@ -79,6 +85,12 @@ func NewAccountStore(cfg config.Config) (AccountStore, error) {
 		return &redisStore{
 			client: client,
 		}, nil
+	case "sqlite":
+		db, err := newSQLiteDB(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return &sqliteAccountStore{db: db}, nil
 	default:
 		return nil, errors.New("不支持的数据保存模式: " + cfg.DataSaveMode)
 	}
@@ -355,4 +367,79 @@ func (s *redisStore) scanUserKeys(ctx context.Context) ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+
+func (s *sqliteAccountStore) LoadAccounts() ([]Account, error) {
+	rows, err := s.db.Query(`SELECT email, password, token, source, expires, proxy_id FROM accounts`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var accounts []Account
+	for rows.Next() {
+		var a Account
+		var source, proxyID sql.NullString
+		if err := rows.Scan(&a.Email, &a.Password, &a.Token, &source, &a.Expires, &proxyID); err != nil {
+			return nil, err
+		}
+		if source.Valid {
+			a.Source = source.String
+		}
+		if proxyID.Valid {
+			a.ProxyID = proxyID.String
+		}
+		accounts = append(accounts, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if accounts == nil {
+		accounts = []Account{}
+	}
+	return accounts, nil
+}
+
+func (s *sqliteAccountStore) SaveAccount(account Account) error {
+	_, err := s.db.Exec(`
+		INSERT INTO accounts (email, password, token, source, expires, proxy_id)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(email) DO UPDATE SET
+			password=excluded.password,
+			token=excluded.token,
+			source=excluded.source,
+			expires=excluded.expires,
+			proxy_id=excluded.proxy_id
+	`, account.Email, account.Password, account.Token, account.Source, account.Expires, account.ProxyID)
+	return err
+}
+
+func (s *sqliteAccountStore) DeleteAccount(email string) error {
+	_, err := s.db.Exec(`DELETE FROM accounts WHERE email = ?`, email)
+	return err
+}
+
+func (s *sqliteAccountStore) SaveAllAccounts(accounts []Account) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM accounts`); err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO accounts (email, password, token, source, expires, proxy_id) VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, a := range accounts {
+		if _, err := stmt.Exec(a.Email, a.Password, a.Token, a.Source, a.Expires, a.ProxyID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

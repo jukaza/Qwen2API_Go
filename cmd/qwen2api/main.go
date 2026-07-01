@@ -58,9 +58,45 @@ func main() {
 		os.Exit(1)
 	}
 
+	apiKeyStore, err := storage.NewAPIKeyStore(cfg)
+	if err != nil {
+		logger.ErrorModule("APP", "初始化API Key存储失败: %v", err)
+		os.Exit(1)
+	}
+
 	proxyMgr := proxy.NewManager(proxyStore, store, logger)
 
 	keyring := auth.NewKeyring(cfg.APIKeys, cfg.AdminKey)
+
+	// Load keys from store. If store is empty, migrate default keys from config.
+	loadedKeys, err := apiKeyStore.LoadAPIKeys()
+	if err == nil && len(loadedKeys) == 0 {
+		var keysToSave []storage.APIKey
+		for _, k := range cfg.APIKeys {
+			keysToSave = append(keysToSave, storage.APIKey{
+				Key:       k,
+				Label:     "Default Key",
+				IsAdmin:   k == cfg.AdminKey,
+				CreatedAt: time.Now().Unix(),
+			})
+		}
+		if len(keysToSave) == 0 {
+			keysToSave = append(keysToSave, storage.APIKey{
+				Key:       "sk-user-change-me",
+				Label:     "Default Admin Key",
+				IsAdmin:   true,
+				CreatedAt: time.Now().Unix(),
+			})
+		}
+		if err := apiKeyStore.SaveAllAPIKeys(keysToSave); err != nil {
+			logger.WarnModule("APP", "初始化默认 API Key 失败: %v", err)
+		} else {
+			logger.InfoModule("APP", "已将默认 API Keys 导入存储中")
+			loadedKeys = keysToSave
+		}
+	}
+	keyring.SyncFromStore(loadedKeys)
+
 	runtime := config.NewRuntime(cfg)
 	stats := metrics.NewDashboardStats()
 	qwenClient := qwen.NewClient(cfg, logger)
@@ -87,7 +123,7 @@ func main() {
 	defer cleanupService.Stop()
 
 	openAIHandler := openai.NewHandler(cfg, runtime, qwenClient, accountService, conversationSessions, proxyMgr, chatTracker, stats, logger)
-	adminHandler := admin.NewHandler(cfg, runtime, keyring, accountService, openAIHandler, stats, logger, sessionStore, tgService, proxyStore, proxyMgr)
+	adminHandler := admin.NewHandler(cfg, runtime, keyring, accountService, openAIHandler, stats, logger, sessionStore, tgService, proxyStore, proxyMgr, apiKeyStore)
 	httpServer := server.New(cfg, keyring, openAIHandler, adminHandler, stats, logger, sessionStore)
 	serverErrCh := make(chan error, 1)
 

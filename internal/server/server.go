@@ -136,6 +136,7 @@ func New(cfg config.Config, keyring *auth.Keyring, openAIHandler *openai.Handler
 	handle("/api/prompts/reset", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleResetPrompts)))
 	handle("/api/addRegularKey", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleAddRegularKey)))
 	handle("/api/deleteRegularKey", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleDeleteRegularKey)))
+	handle("/api/updateAPIKey", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleUpdateAPIKey)))
 	handle("/api/setAutoRefresh", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleSetAutoRefresh)))
 	handle("/api/setBatchLoginConcurrency", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleSetBatchLoginConcurrency)))
 	handle("/api/setOutThink", "admin", ensureMethod(http.MethodPost, withAdminKey(adminHandler.HandleSetOutThink)))
