@@ -41,7 +41,7 @@ export function OverviewTab({
         <StatCard
           title={t("overview.accountValid")}
           value={accounts?.valid ?? "--"}
-          description="Khỏe mạnh và xoay vòng"
+          description="Hoạt động tốt và xoay vòng"
           tone="success"
         />
         <StatCard

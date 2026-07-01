@@ -71,7 +71,7 @@
   },
   "overview": {
     "accountTotal": "Tổng số Account",
-    "accountValid": "Account khỏe mạnh",
+    "accountValid": "Account hoạt động tốt",
     "accountExpiring": "Sắp hết hạn",
     "modelTotal": "Tổng số model",
     "rpm": "Chỉ số RPM",
@@ -114,7 +114,7 @@
     "accountList": "Danh sách Account",
     "searchEmail": "Tìm kiếm theo từ khóa Email",
     "allStatus": "Tất cả trạng thái",
-    "statusValid": "Khỏe mạnh",
+    "statusValid": "Hoạt động tốt",
     "statusExpiring": "Sắp hết hạn",
     "statusExpired": "Đã hết hạn",
     "statusInvalid": "Không hợp lệ",
